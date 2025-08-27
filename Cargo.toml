@@ -1,0 +1,39 @@
+[package]
+name = "rskv"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# 并发和异步支持
+tokio = { version = "1.0", features = ["full"] }
+crossbeam-epoch = "0.9"
+dashmap = "5.0"
+rayon = "1.0"
+
+# 序列化支持
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.0"
+
+# 错误处理
+thiserror = "1.0"
+
+# I/O 和文件系统
+parking_lot = "0.12"
+
+# 哈希和加密
+ahash = "0.8"
+
+# 内存分配和管理
+memmap2 = "0.9"
+
+# 日志
+log = "0.4"
+env_logger = "0.10"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = "3.0"
+
+[[bench]]
+name = "performance"
+harness = false

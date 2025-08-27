@@ -1,9 +1,10 @@
 //! rskv 性能演示
-//! 
+//!
 //! 这个示例展示了 rskv 在不同场景下的性能表现
 
-use rskv::{RsKv, Config};
 use std::time::Instant;
+
+use rskv::{Config, RsKv};
 use tempfile::tempdir;
 
 #[tokio::main]
@@ -31,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 测试不同大小的写入性能
     println!("\n📝 写入性能测试");
     println!("----------------");
-    
+
     let value_sizes = vec![
         ("1B", 1),
         ("100B", 100),
@@ -43,22 +44,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (size_name, size) in &value_sizes {
         let test_data = vec![42u8; *size];
         let num_ops = if *size > 10240 { 100 } else { 1000 };
-        
+
         let start = Instant::now();
         for i in 0..num_ops {
             let key = format!("write_test_{}_{}", size_name, i).into_bytes();
             rskv.upsert(key, test_data.clone()).await?;
         }
         let elapsed = start.elapsed();
-        
-        let throughput = (*size as f64 * num_ops as f64) / elapsed.as_secs_f64() / (1024.0 * 1024.0);
+
+        let throughput =
+            (*size as f64 * num_ops as f64) / elapsed.as_secs_f64() / (1024.0 * 1024.0);
         let ops_per_sec = num_ops as f64 / elapsed.as_secs_f64();
-        
-        println!("  {}: {:.2} MB/s, {:.0} ops/s, {:.2} µs/op", 
-                 size_name,
-                 throughput,
-                 ops_per_sec,
-                 elapsed.as_micros() as f64 / num_ops as f64);
+
+        println!(
+            "  {}: {:.2} MB/s, {:.0} ops/s, {:.2} µs/op",
+            size_name,
+            throughput,
+            ops_per_sec,
+            elapsed.as_micros() as f64 / num_ops as f64
+        );
     }
 
     // 测试读取性能
@@ -67,22 +71,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (size_name, size) in &value_sizes {
         let num_ops = if *size > 10240 { 100 } else { 1000 };
-        
+
         let start = Instant::now();
         for i in 0..num_ops {
             let key = format!("write_test_{}_{}", size_name, i).into_bytes();
             let _value = rskv.read(&key).await?;
         }
         let elapsed = start.elapsed();
-        
-        let throughput = (*size as f64 * num_ops as f64) / elapsed.as_secs_f64() / (1024.0 * 1024.0);
+
+        let throughput =
+            (*size as f64 * num_ops as f64) / elapsed.as_secs_f64() / (1024.0 * 1024.0);
         let ops_per_sec = num_ops as f64 / elapsed.as_secs_f64();
-        
-        println!("  {}: {:.2} MB/s, {:.0} ops/s, {:.2} µs/op", 
-                 size_name,
-                 throughput,
-                 ops_per_sec,
-                 elapsed.as_micros() as f64 / num_ops as f64);
+
+        println!(
+            "  {}: {:.2} MB/s, {:.0} ops/s, {:.2} µs/op",
+            size_name,
+            throughput,
+            ops_per_sec,
+            elapsed.as_micros() as f64 / num_ops as f64
+        );
     }
 
     // 测试混合工作负载
@@ -94,11 +101,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for read_pct in read_percentages {
         let num_ops = 1000;
-        
+
         let start = Instant::now();
         for i in 0..num_ops {
             let key = format!("mixed_test_{}", i % 100).into_bytes();
-            
+
             if (i % 100) < read_pct {
                 // 读操作
                 let _value = rskv.read(&key).await?;
@@ -108,13 +115,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         let elapsed = start.elapsed();
-        
+
         let ops_per_sec = num_ops as f64 / elapsed.as_secs_f64();
-        
-        println!("  {}% 读取: {:.0} ops/s, {:.2} µs/op", 
-                 read_pct,
-                 ops_per_sec,
-                 elapsed.as_micros() as f64 / num_ops as f64);
+
+        println!(
+            "  {}% 读取: {:.0} ops/s, {:.2} µs/op",
+            read_pct,
+            ops_per_sec,
+            elapsed.as_micros() as f64 / num_ops as f64
+        );
     }
 
     // 测试扫描性能
@@ -132,21 +141,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
     let all_results = rskv.scan_all().await?;
     let scan_elapsed = start.elapsed();
-    
-    println!("  全表扫描: {} 条记录, {:.2} ms, {:.0} records/s",
-             all_results.len(),
-             scan_elapsed.as_millis(),
-             all_results.len() as f64 / scan_elapsed.as_secs_f64());
+
+    println!(
+        "  全表扫描: {} 条记录, {:.2} ms, {:.0} records/s",
+        all_results.len(),
+        scan_elapsed.as_millis(),
+        all_results.len() as f64 / scan_elapsed.as_secs_f64()
+    );
 
     // 前缀扫描
     let start = Instant::now();
     let prefix_results = rskv.scan_prefix(b"scan_test_").await?;
     let prefix_elapsed = start.elapsed();
-    
-    println!("  前缀扫描: {} 条记录, {:.2} ms, {:.0} records/s",
-             prefix_results.len(),
-             prefix_elapsed.as_millis(),
-             prefix_results.len() as f64 / prefix_elapsed.as_secs_f64());
+
+    println!(
+        "  前缀扫描: {} 条记录, {:.2} ms, {:.0} records/s",
+        prefix_results.len(),
+        prefix_elapsed.as_millis(),
+        prefix_results.len() as f64 / prefix_elapsed.as_secs_f64()
+    );
 
     // 显示统计信息
     println!("\n📊 存储统计");

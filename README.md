@@ -1,8 +1,9 @@
 # rskv: A High-Performance Key-Value Store in Rust
 
-![Coverage](https://img.shields.io/badge/coverage-59.12%25-yellow)
-![Tests](https://img.shields.io/badge/tests-44%20passed-brightgreen)
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
+[![CI](https://github.com/yourusername/rskv/workflows/CI/badge.svg)](https://github.com/yourusername/rskv/actions)
+[![Code Quality](https://github.com/yourusername/rskv/workflows/Code%20Quality/badge.svg)](https://github.com/yourusername/rskv/actions)
+[![Coverage](https://codecov.io/gh/yourusername/rskv/branch/main/graph/badge.svg)](https://codecov.io/gh/yourusername/rskv)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 `rskv` is a high-performance, concurrent, persistent key-value store inspired by the design of Microsoft's FASTER. It is designed from the ground up in Rust to leverage modern hardware and concurrency models, focusing on safety, speed, and low-latency operations.
 
@@ -103,6 +104,47 @@ cargo bench --bench performance -- write_performance
 cargo bench --bench performance -- thread_scaling
 cargo bench --bench performance -- mixed_workload
 ```
+
+## 🛠️ Development Tools
+
+rskv uses a comprehensive set of development tools to ensure code quality and maintainability:
+
+### Code Quality Tools
+
+- **rustfmt**: Code formatting with consistent style
+- **clippy**: Linting and code quality checks
+- **cargo-audit**: Security vulnerability scanning
+- **cargo-deny**: Dependency license and security management
+- **cargo-tarpaulin**: Code coverage analysis
+- **cargo-geiger**: Unsafe code detection
+- **cargo-deadlinks**: Documentation link validation
+
+### Quick Start for Developers
+
+```bash
+# Install development tools
+make install-deps
+
+# Run all quality checks
+make quality
+
+# Quick development cycle
+make dev
+
+# Pre-commit checks
+./scripts/pre-commit.sh
+```
+
+### GitHub Actions CI/CD
+
+The project uses GitHub Actions for automated testing and quality assurance:
+
+- **CI Pipeline**: Compilation, testing, and coverage on multiple platforms
+- **Code Quality**: Strict linting, formatting, and security checks
+- **Performance Testing**: Automated benchmark execution
+- **Documentation**: Auto-generated docs and link validation
+
+See [`DEVELOPMENT.md`](DEVELOPMENT.md) for detailed development guidelines.
 
 ### Performance Highlights
 

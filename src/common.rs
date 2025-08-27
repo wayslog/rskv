@@ -1,10 +1,10 @@
 //! Common types and error definitions for rskv
-//! 
+//!
 //! This module contains core data types and error handling used throughout the system.
 //! Inspired by FASTER's address.h and common error handling patterns.
 
-use thiserror::Error;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 /// Synchronization mode for durability vs performance trade-off
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,8 +41,8 @@ pub const PAGE_SIZE: u32 = 32 * 1024 * 1024; // 32MB
 pub const ADDRESS_BITS: u64 = 48;
 pub const OFFSET_BITS: u64 = 25;
 pub const PAGE_BITS: u64 = ADDRESS_BITS - OFFSET_BITS; // 23 bits
-pub const MAX_OFFSET: u32 = ((1u32 << OFFSET_BITS) - 1) as u32;
-pub const MAX_PAGE: u32 = ((1u32 << PAGE_BITS) - 1) as u32;
+pub const MAX_OFFSET: u32 = (1u32 << OFFSET_BITS) - 1;
+pub const MAX_PAGE: u32 = (1u32 << PAGE_BITS) - 1;
 pub const INVALID_ADDRESS: Address = 1; // Matches FASTER's kInvalidAddress
 
 /// Address utility functions
@@ -66,71 +66,71 @@ pub fn make_address(page: u32, offset: u32) -> Address {
 pub enum RsKvError {
     #[error("IO Error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("Serialization Error: {0}")]
     Serialization(#[from] bincode::Error),
-    
+
     /// Key not found in the store
     #[error("Key not found")]
     KeyNotFound,
-    
+
     #[error("Address out of bounds: {address}")]
     AddressOutOfBounds { address: Address },
-    
+
     #[error("Page not found: {page}")]
     PageNotFound { page: u32 },
-    
+
     #[error("Allocation failed: size {size}")]
     AllocationFailed { size: u32 },
-    
+
     #[error("Checkpoint operation failed: {message}")]
     CheckpointFailed { message: String },
-    
+
     #[error("Recovery operation failed: {message}")]
     RecoveryFailed { message: String },
-    
+
     #[error("Garbage collection failed: {message}")]
     GarbageCollectionFailed { message: String },
-    
+
     #[error("Configuration error: {message}")]
     Configuration { message: String },
-    
+
     /// Invalid configuration
     #[error("Invalid configuration: {message}")]
     InvalidConfig { message: String },
-    
+
     /// Key is too large
     #[error("Key size {size} bytes exceeds maximum allowed size {max_size} bytes")]
     KeyTooLarge { size: usize, max_size: usize },
-    
+
     /// Value is too large  
     #[error("Value size {size} bytes exceeds maximum allowed size {max_size} bytes")]
     ValueTooLarge { size: usize, max_size: usize },
-    
+
     /// Storage device error
     #[error("Storage device error: {message}")]
     StorageError { message: String },
-    
+
     /// Memory mapping error
     #[error("Memory mapping error: {message}")]
     MmapError { message: String },
-    
+
     /// Data corruption detected
     #[error("Data corruption detected: {message}")]
     Corruption { message: String },
-    
+
     /// Resource exhausted
     #[error("Resource exhausted: {resource}")]
     ResourceExhausted { resource: String },
-    
+
     /// Operation timeout
     #[error("Operation timed out after {duration_ms} ms")]
     Timeout { duration_ms: u64 },
-    
+
     /// Concurrent operation conflict
     #[error("Concurrent operation conflict: {message}")]
     Conflict { message: String },
-    
+
     #[error("Internal error: {message}")]
     Internal { message: String },
 }
@@ -138,34 +138,34 @@ pub enum RsKvError {
 impl RsKvError {
     /// Check if this error is recoverable
     pub fn is_recoverable(&self) -> bool {
-        match self {
-            RsKvError::Io(_) => true,
-            RsKvError::Timeout { .. } => true,
-            RsKvError::Conflict { .. } => true,
-            RsKvError::ResourceExhausted { .. } => true,
-            RsKvError::StorageError { .. } => true,
-            RsKvError::MmapError { .. } => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            RsKvError::Io(_)
+                | RsKvError::Timeout { .. }
+                | RsKvError::Conflict { .. }
+                | RsKvError::ResourceExhausted { .. }
+                | RsKvError::StorageError { .. }
+                | RsKvError::MmapError { .. }
+        )
     }
-    
+
     /// Check if this error indicates data corruption
     pub fn is_corruption(&self) -> bool {
         matches!(self, RsKvError::Corruption { .. })
     }
-    
+
     /// Check if this error is a user input error
     pub fn is_user_error(&self) -> bool {
-        match self {
-            RsKvError::KeyNotFound => true,
-            RsKvError::KeyTooLarge { .. } => true,
-            RsKvError::ValueTooLarge { .. } => true,
-            RsKvError::InvalidConfig { .. } => true,
-            RsKvError::Configuration { .. } => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            RsKvError::KeyNotFound
+                | RsKvError::KeyTooLarge { .. }
+                | RsKvError::ValueTooLarge { .. }
+                | RsKvError::InvalidConfig { .. }
+                | RsKvError::Configuration { .. }
+        )
     }
-    
+
     /// Get error category for logging and metrics
     pub fn category(&self) -> &'static str {
         match self {
@@ -197,7 +197,7 @@ impl RsKvError {
 impl From<std::num::TryFromIntError> for RsKvError {
     fn from(err: std::num::TryFromIntError) -> Self {
         RsKvError::Internal {
-            message: format!("Integer conversion error: {}", err),
+            message: format!("Integer conversion error: {err}"),
         }
     }
 }
@@ -290,79 +290,85 @@ impl Config {
                 message: "Memory size must be at least 1MB".to_string(),
             });
         }
-        
+
         if self.memory_size > 64 * 1024 * 1024 * 1024 {
             return Err(RsKvError::InvalidConfig {
                 message: "Memory size cannot exceed 64GB".to_string(),
             });
         }
-        
+
         // Page size validation
         if self.page_size < 4096 {
             return Err(RsKvError::InvalidConfig {
                 message: "Page size must be at least 4KB".to_string(),
             });
         }
-        
+
         if !self.page_size.is_power_of_two() {
             return Err(RsKvError::InvalidConfig {
                 message: "Page size must be a power of 2".to_string(),
             });
         }
-        
+
         if u64::from(self.page_size) > self.memory_size {
             return Err(RsKvError::InvalidConfig {
                 message: "Page size cannot be larger than memory size".to_string(),
             });
         }
-        
+
         // Storage directory validation
         if self.storage_dir.is_empty() {
             return Err(RsKvError::InvalidConfig {
                 message: "Storage directory cannot be empty".to_string(),
             });
         }
-        
+
         // Interval validation
         if self.checkpoint_interval_ms < 100 {
             return Err(RsKvError::InvalidConfig {
                 message: "Checkpoint interval must be at least 100ms".to_string(),
             });
         }
-        
+
         if self.gc_interval_ms < 1000 {
             return Err(RsKvError::InvalidConfig {
                 message: "GC interval must be at least 1000ms".to_string(),
             });
         }
-        
+
         // Thread count validation
         if self.max_background_threads == 0 {
             return Err(RsKvError::InvalidConfig {
                 message: "Maximum background threads must be at least 1".to_string(),
             });
         }
-        
+
         if self.max_background_threads > 32 {
             return Err(RsKvError::InvalidConfig {
                 message: "Maximum background threads cannot exceed 32".to_string(),
             });
         }
-        
+
         // Cross-parameter validation
         if self.checkpoint_interval_ms > self.gc_interval_ms {
-            log::warn!("Checkpoint interval ({} ms) is longer than GC interval ({} ms), this might cause performance issues",
-                      self.checkpoint_interval_ms, self.gc_interval_ms);
+            log::warn!(
+                "Checkpoint interval ({} ms) is longer than GC interval ({} ms), this might cause \
+                 performance issues",
+                self.checkpoint_interval_ms,
+                self.gc_interval_ms
+            );
         }
-        
+
         Ok(())
     }
-    
+
     /// Create a configuration with memory size optimization
     pub fn with_memory_size(memory_size: u64) -> Result<Self> {
-        let mut config = Self::default();
-        config.memory_size = memory_size;
-        
+        let mut config = Self {
+            memory_size,
+            ..Self::default()
+        };
+
         // Adjust page size based on memory size for optimal performance
         if memory_size >= 8 * 1024 * 1024 * 1024 {
             // 8GB+: Use 64MB pages
@@ -377,33 +383,37 @@ impl Config {
             // <256MB: Use 8MB pages
             config.page_size = 8 * 1024 * 1024;
         }
-        
+
         config.validate()?;
         Ok(config)
     }
-    
+
     /// Create a configuration optimized for high-performance scenarios
     pub fn high_performance() -> Result<Self> {
-        let mut config = Self::default();
-        config.memory_size = 4 * 1024 * 1024 * 1024; // 4GB
-        config.page_size = 64 * 1024 * 1024; // 64MB pages
-        config.checkpoint_interval_ms = 30000; // 30 seconds
-        config.gc_interval_ms = 60000; // 1 minute
-        config.max_background_threads = 8;
-        
+        let config = Self {
+            memory_size: 4 * 1024 * 1024 * 1024, // 4GB
+            page_size: 64 * 1024 * 1024,         // 64MB pages
+            checkpoint_interval_ms: 30000,       // 30 seconds
+            gc_interval_ms: 60000,               // 1 minute
+            max_background_threads: 8,
+            ..Self::default()
+        };
+
         config.validate()?;
         Ok(config)
     }
-    
+
     /// Create a configuration optimized for low-memory scenarios
     pub fn low_memory() -> Result<Self> {
-        let mut config = Self::default();
-        config.memory_size = 64 * 1024 * 1024; // 64MB
-        config.page_size = 4 * 1024 * 1024; // 4MB pages
-        config.checkpoint_interval_ms = 2000; // 2 seconds
-        config.gc_interval_ms = 5000; // 5 seconds
-        config.max_background_threads = 2;
-        
+        let config = Self {
+            memory_size: 64 * 1024 * 1024, // 64MB
+            page_size: 4 * 1024 * 1024,    // 4MB pages
+            checkpoint_interval_ms: 2000,  // 2 seconds
+            gc_interval_ms: 5000,          // 5 seconds
+            max_background_threads: 2,
+            ..Self::default()
+        };
+
         config.validate()?;
         Ok(config)
     }
@@ -425,7 +435,7 @@ impl Default for Config {
             readahead_size: 1024 * 1024, // 1MB
             enable_write_batching: true,
             write_batch_size: 64 * 1024, // 64KB
-            enable_compression: false, // Disabled by default for simplicity
+            enable_compression: false,   // Disabled by default for simplicity
             sync_mode: SyncMode::Periodic,
             preallocate_log: true,
             log_prealloc_size: 100 * 1024 * 1024, // 100MB
@@ -441,7 +451,7 @@ mod tests {
     fn test_address_utilities() {
         let page = 100;
         let offset = 1024;
-        
+
         let address = make_address(page, offset);
         assert_eq!(get_page(address), page);
         assert_eq!(get_offset(address), offset);

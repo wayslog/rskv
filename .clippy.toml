@@ -1,0 +1,7 @@
+# Clippy configuration for rskv project
+
+# 复杂性检查
+cognitive-complexity-threshold = 25
+type-complexity-threshold = 1000
+too-many-arguments-threshold = 10
+too-many-lines-threshold = 500

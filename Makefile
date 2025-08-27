@@ -29,7 +29,14 @@ test:
 # Generate test coverage
 coverage:
 	@if command -v cargo-tarpaulin >/dev/null 2>&1; then \
-		chmod +x scripts/coverage.sh && ./scripts/coverage.sh; \
+		cargo tarpaulin --all-features --workspace --out xml --out html --out json --out lcov && \
+		mkdir -p coverage && \
+		mv cobertura.xml coverage/ && \
+		mv lcov.info coverage/ && \
+		mv tarpaulin-report.html coverage/ && \
+		mv tarpaulin-report.json coverage/ && \
+		date > coverage/timestamp.txt && \
+		echo "![Coverage](https://img.shields.io/badge/coverage-$$(grep -o 'line-rate="[0-9.]*"' coverage/cobertura.xml | grep -o '[0-9.]*' | awk '{printf "%.2f", $$1*100}')%25-yellow)" > coverage/coverage_badge.md; \
 	else \
 		echo "cargo-tarpaulin not found. Installing..."; \
 		cargo install cargo-tarpaulin; \
@@ -82,6 +89,12 @@ install-deps:
 	cargo install cargo-tarpaulin
 	cargo install cargo-audit
 	cargo install cargo-outdated
+	cargo install cargo-deny
+	cargo install cargo-geiger
+	cargo install cargo-deadlinks
+	cargo install cargo-deny
+	cargo install cargo-geiger
+	cargo install cargo-deadlinks
 
 # Security audit
 audit:
@@ -92,8 +105,21 @@ outdated:
 	cargo outdated
 
 # Run all quality checks
-quality: fmt lint test coverage
+quality: fmt lint test coverage audit deny geiger deadlinks
 	@echo "All quality checks completed!"
+
+# Run cargo-deny
+deny:
+	cargo deny check
+
+# Run cargo-geiger
+geiger:
+	cargo geiger --all-features --workspace
+
+# Run cargo-deadlinks
+deadlinks:
+	cargo doc --all-features --no-deps --document-private-items
+	cargo deadlinks --dir target/doc
 
 # Benchmark
 bench:

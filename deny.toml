@@ -1,0 +1,93 @@
+# Cargo-deny configuration for rskv project
+
+[advisories]
+# 安全公告数据库
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+vulnerability = "deny"
+yanked = "warn"
+ignore = []
+
+[licenses]
+# 许可证检查
+default = "deny"
+copyleft = "deny"
+copyright = "allow"
+patent = "deny"
+# 允许的许可证
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unlicense",
+    "Zlib",
+    "CC0-1.0",
+    "MPL-2.0",
+]
+# 明确拒绝的许可证
+deny = [
+    "GPL-2.0",
+    "GPL-3.0",
+    "LGPL-2.0",
+    "LGPL-2.1",
+    "LGPL-3.0",
+    "AGPL-1.0",
+    "AGPL-3.0",
+]
+# 许可证例外
+exceptions = [
+    # 允许一些工具使用 GPL 许可证
+    { name = "criterion", allow = ["MIT", "Apache-2.0"] },
+]
+
+[source]
+# 源配置
+registry = "https://github.com/rust-lang/crates.io-index"
+# 允许的 git 源
+git = [
+    { url = "https://github.com/rust-lang/crates.io-index" },
+]
+
+[target.'cfg(all())'.dependencies]
+# 全局依赖规则
+# 禁止使用特定版本的依赖
+ban = [
+    # 禁止使用不安全的依赖
+    { name = "memmap", version = "=0.7.0", reason = "Use memmap2 instead" },
+]
+
+# 允许的依赖
+allow = [
+    # 核心依赖
+    { name = "tokio", version = "1.0" },
+    { name = "crossbeam-epoch", version = "0.9" },
+    { name = "dashmap", version = "5.0" },
+    { name = "rayon", version = "1.0" },
+    { name = "serde", version = "1.0" },
+    { name = "bincode", version = "1.0" },
+    { name = "thiserror", version = "1.0" },
+    { name = "parking_lot", version = "0.12" },
+    { name = "ahash", version = "0.8" },
+    { name = "memmap2", version = "0.9" },
+    { name = "log", version = "0.4" },
+    { name = "env_logger", version = "0.10" },
+    # 开发依赖
+    { name = "criterion", version = "0.5" },
+    { name = "tempfile", version = "3.0" },
+]
+
+[metadata]
+# 元数据
+name = "rskv"
+version = "0.1.0"
+description = "High-performance KV store inspired by Microsoft FASTER"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/rskv"
+homepage = "https://github.com/yourusername/rskv"
+documentation = "https://docs.rs/rskv"
+readme = "README.md"
+keywords = ["kv", "store", "database", "faster", "high-performance"]
+categories = ["database", "asynchronous", "concurrency"]

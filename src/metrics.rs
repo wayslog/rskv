@@ -3,9 +3,10 @@
 //! This module provides comprehensive performance monitoring capabilities
 //! including operation counters, latency tracking, and resource utilization.
 
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
+
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
@@ -264,87 +265,124 @@ impl MetricsCollector {
             start_time: Instant::now(),
         }
     }
-    
+
     /// Record a read operation
     pub fn record_read(&self, latency: Duration, bytes: u64, cache_hit: bool) {
         self.operations.reads_total.fetch_add(1, Ordering::Relaxed);
-        self.operations.bytes_read.fetch_add(bytes, Ordering::Relaxed);
-        
+        self.operations
+            .bytes_read
+            .fetch_add(bytes, Ordering::Relaxed);
+
         if cache_hit {
-            self.operations.read_cache_hits.fetch_add(1, Ordering::Relaxed);
+            self.operations
+                .read_cache_hits
+                .fetch_add(1, Ordering::Relaxed);
         } else {
-            self.operations.read_cache_misses.fetch_add(1, Ordering::Relaxed);
+            self.operations
+                .read_cache_misses
+                .fetch_add(1, Ordering::Relaxed);
         }
-        
+
         self.latency.read_latencies.write().record(latency);
     }
-    
+
     /// Record a write operation
     pub fn record_write(&self, latency: Duration, bytes: u64) {
         self.operations.writes_total.fetch_add(1, Ordering::Relaxed);
-        self.operations.bytes_written.fetch_add(bytes, Ordering::Relaxed);
+        self.operations
+            .bytes_written
+            .fetch_add(bytes, Ordering::Relaxed);
         self.latency.write_latencies.write().record(latency);
     }
-    
+
     /// Record a delete operation
     pub fn record_delete(&self, latency: Duration) {
-        self.operations.deletes_total.fetch_add(1, Ordering::Relaxed);
+        self.operations
+            .deletes_total
+            .fetch_add(1, Ordering::Relaxed);
         self.latency.delete_latencies.write().record(latency);
     }
-    
+
     /// Record a scan operation
     pub fn record_scan(&self, latency: Duration) {
         self.operations.scans_total.fetch_add(1, Ordering::Relaxed);
         self.latency.scan_latencies.write().record(latency);
     }
-    
+
     /// Record storage operation
     pub fn record_storage_op(&self, is_read: bool, bytes: u64) {
         if is_read {
             self.storage.disk_reads.fetch_add(1, Ordering::Relaxed);
-            self.storage.disk_bytes_read.fetch_add(bytes, Ordering::Relaxed);
+            self.storage
+                .disk_bytes_read
+                .fetch_add(bytes, Ordering::Relaxed);
         } else {
             self.storage.disk_writes.fetch_add(1, Ordering::Relaxed);
-            self.storage.disk_bytes_written.fetch_add(bytes, Ordering::Relaxed);
+            self.storage
+                .disk_bytes_written
+                .fetch_add(bytes, Ordering::Relaxed);
         }
     }
-    
+
     /// Record memory usage
     pub fn record_memory_usage(&self, current: u64) {
-        self.memory.current_memory_usage.store(current, Ordering::Relaxed);
-        
+        self.memory
+            .current_memory_usage
+            .store(current, Ordering::Relaxed);
+
         // Update peak if necessary
         let mut peak = self.memory.peak_memory_usage.load(Ordering::Relaxed);
         while current > peak {
             match self.memory.peak_memory_usage.compare_exchange_weak(
-                peak, current, Ordering::Relaxed, Ordering::Relaxed
+                peak,
+                current,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
             ) {
                 Ok(_) => break,
                 Err(new_peak) => peak = new_peak,
             }
         }
     }
-    
+
     /// Record an error
     pub fn record_error(&self, error_category: &str) {
         self.errors.total_errors.fetch_add(1, Ordering::Relaxed);
-        
+
         match error_category {
-            "io" => { self.errors.io_errors.fetch_add(1, Ordering::Relaxed); },
-            "serialization" => { self.errors.serialization_errors.fetch_add(1, Ordering::Relaxed); },
-            "corruption" => { self.errors.corruption_errors.fetch_add(1, Ordering::Relaxed); },
-            "configuration" => { self.errors.config_errors.fetch_add(1, Ordering::Relaxed); },
-            "timeout" => { self.errors.timeout_errors.fetch_add(1, Ordering::Relaxed); },
-            "resource_exhausted" => { self.errors.resource_exhausted_errors.fetch_add(1, Ordering::Relaxed); },
-            _ => {}, // Unknown error category
+            "io" => {
+                self.errors.io_errors.fetch_add(1, Ordering::Relaxed);
+            }
+            "serialization" => {
+                self.errors
+                    .serialization_errors
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+            "corruption" => {
+                self.errors
+                    .corruption_errors
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+            "configuration" => {
+                self.errors.config_errors.fetch_add(1, Ordering::Relaxed);
+            }
+            "timeout" => {
+                self.errors.timeout_errors.fetch_add(1, Ordering::Relaxed);
+            }
+            "resource_exhausted" => {
+                self.errors
+                    .resource_exhausted_errors
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+            _ => {} // Unknown error category
         }
     }
-    
+
     /// Get a snapshot of current metrics
     pub fn snapshot(&self) -> MetricsSnapshot {
         let uptime = self.start_time.elapsed();
         let uptime_seconds = uptime.as_secs();
-        
+
         // Operation metrics
         let reads = self.operations.reads_total.load(Ordering::Relaxed);
         let writes = self.operations.writes_total.load(Ordering::Relaxed);
@@ -352,20 +390,20 @@ impl MetricsCollector {
         let scans = self.operations.scans_total.load(Ordering::Relaxed);
         let cache_hits = self.operations.read_cache_hits.load(Ordering::Relaxed);
         let cache_misses = self.operations.read_cache_misses.load(Ordering::Relaxed);
-        
+
         let total_ops = reads + writes + deletes + scans;
         let ops_per_second = if uptime_seconds > 0 {
             total_ops as f64 / uptime_seconds as f64
         } else {
             0.0
         };
-        
+
         let cache_hit_rate = if cache_hits + cache_misses > 0 {
             cache_hits as f64 / (cache_hits + cache_misses) as f64
         } else {
             0.0
         };
-        
+
         MetricsSnapshot {
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -403,13 +441,17 @@ impl MetricsCollector {
                 disk_flushes: self.storage.disk_flushes.load(Ordering::Relaxed),
                 disk_syncs: self.storage.disk_syncs.load(Ordering::Relaxed),
                 disk_read_bandwidth_mbps: if uptime_seconds > 0 {
-                    (self.storage.disk_bytes_read.load(Ordering::Relaxed) as f64) / 
-                    (uptime_seconds as f64 * 1024.0 * 1024.0)
-                } else { 0.0 },
+                    (self.storage.disk_bytes_read.load(Ordering::Relaxed) as f64)
+                        / (uptime_seconds as f64 * 1024.0 * 1024.0)
+                } else {
+                    0.0
+                },
                 disk_write_bandwidth_mbps: if uptime_seconds > 0 {
-                    (self.storage.disk_bytes_written.load(Ordering::Relaxed) as f64) / 
-                    (uptime_seconds as f64 * 1024.0 * 1024.0)
-                } else { 0.0 },
+                    (self.storage.disk_bytes_written.load(Ordering::Relaxed) as f64)
+                        / (uptime_seconds as f64 * 1024.0 * 1024.0)
+                } else {
+                    0.0
+                },
             },
             memory: MemoryMetricsSnapshot {
                 current_memory_usage: self.memory.current_memory_usage.load(Ordering::Relaxed),
@@ -421,21 +463,35 @@ impl MetricsCollector {
                 memory_utilization: 0.0, // TODO: Calculate based on system memory
             },
             background: BackgroundMetricsSnapshot {
-                checkpoints_completed: self.background.checkpoints_completed.load(Ordering::Relaxed),
+                checkpoints_completed: self
+                    .background
+                    .checkpoints_completed
+                    .load(Ordering::Relaxed),
                 checkpoint_failures: self.background.checkpoint_failures.load(Ordering::Relaxed),
                 avg_checkpoint_duration_ms: {
-                    let completed = self.background.checkpoints_completed.load(Ordering::Relaxed);
+                    let completed = self
+                        .background
+                        .checkpoints_completed
+                        .load(Ordering::Relaxed);
                     if completed > 0 {
-                        self.background.checkpoint_duration_ms.load(Ordering::Relaxed) as f64 / completed as f64
-                    } else { 0.0 }
+                        self.background
+                            .checkpoint_duration_ms
+                            .load(Ordering::Relaxed) as f64
+                            / completed as f64
+                    } else {
+                        0.0
+                    }
                 },
                 gc_cycles_completed: self.background.gc_cycles_completed.load(Ordering::Relaxed),
                 gc_failures: self.background.gc_failures.load(Ordering::Relaxed),
                 avg_gc_duration_ms: {
                     let completed = self.background.gc_cycles_completed.load(Ordering::Relaxed);
                     if completed > 0 {
-                        self.background.gc_duration_ms.load(Ordering::Relaxed) as f64 / completed as f64
-                    } else { 0.0 }
+                        self.background.gc_duration_ms.load(Ordering::Relaxed) as f64
+                            / completed as f64
+                    } else {
+                        0.0
+                    }
                 },
                 gc_bytes_reclaimed: self.background.gc_bytes_reclaimed.load(Ordering::Relaxed),
             },
@@ -446,14 +502,19 @@ impl MetricsCollector {
                 corruption_errors: self.errors.corruption_errors.load(Ordering::Relaxed),
                 config_errors: self.errors.config_errors.load(Ordering::Relaxed),
                 timeout_errors: self.errors.timeout_errors.load(Ordering::Relaxed),
-                resource_exhausted_errors: self.errors.resource_exhausted_errors.load(Ordering::Relaxed),
+                resource_exhausted_errors: self
+                    .errors
+                    .resource_exhausted_errors
+                    .load(Ordering::Relaxed),
                 error_rate: if total_ops > 0 {
                     self.errors.total_errors.load(Ordering::Relaxed) as f64 / total_ops as f64
-                } else { 0.0 },
+                } else {
+                    0.0
+                },
             },
         }
     }
-    
+
     /// Reset all metrics (useful for testing)
     pub fn reset(&self) {
         // Reset operation metrics
@@ -462,16 +523,18 @@ impl MetricsCollector {
         self.operations.deletes_total.store(0, Ordering::Relaxed);
         self.operations.scans_total.store(0, Ordering::Relaxed);
         self.operations.read_cache_hits.store(0, Ordering::Relaxed);
-        self.operations.read_cache_misses.store(0, Ordering::Relaxed);
+        self.operations
+            .read_cache_misses
+            .store(0, Ordering::Relaxed);
         self.operations.bytes_read.store(0, Ordering::Relaxed);
         self.operations.bytes_written.store(0, Ordering::Relaxed);
-        
+
         // Reset latency histograms
         self.latency.read_latencies.write().reset();
         self.latency.write_latencies.write().reset();
         self.latency.delete_latencies.write().reset();
         self.latency.scan_latencies.write().reset();
-        
+
         // Reset other metrics...
         // (Implementation truncated for brevity)
     }
@@ -491,9 +554,11 @@ impl LatencyMetrics {
 impl LatencyHistogram {
     fn new() -> Self {
         // Bucket boundaries: 10us, 50us, 100us, 500us, 1ms, 5ms, 10ms, 50ms, 100ms, 500ms, 1s, 5s
-        let buckets = vec![10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000];
+        let buckets = vec![
+            10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000,
+        ];
         let counts = buckets.iter().map(|_| AtomicU64::new(0)).collect();
-        
+
         Self {
             buckets,
             counts,
@@ -503,31 +568,37 @@ impl LatencyHistogram {
             max_latency: AtomicU64::new(0),
         }
     }
-    
+
     fn record(&self, latency: Duration) {
         let latency_us = latency.as_micros() as u64;
-        
+
         // Update min/max
         let mut current_min = self.min_latency.load(Ordering::Relaxed);
         while latency_us < current_min {
             match self.min_latency.compare_exchange_weak(
-                current_min, latency_us, Ordering::Relaxed, Ordering::Relaxed
+                current_min,
+                latency_us,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
             ) {
                 Ok(_) => break,
                 Err(new_min) => current_min = new_min,
             }
         }
-        
+
         let mut current_max = self.max_latency.load(Ordering::Relaxed);
         while latency_us > current_max {
             match self.max_latency.compare_exchange_weak(
-                current_max, latency_us, Ordering::Relaxed, Ordering::Relaxed
+                current_max,
+                latency_us,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
             ) {
                 Ok(_) => break,
                 Err(new_max) => current_max = new_max,
             }
         }
-        
+
         // Find appropriate bucket and increment
         for (i, &bucket_limit) in self.buckets.iter().enumerate() {
             if latency_us <= bucket_limit {
@@ -535,31 +606,31 @@ impl LatencyHistogram {
                 break;
             }
         }
-        
+
         // Update totals
         self.total_count.fetch_add(1, Ordering::Relaxed);
         self.total_sum.fetch_add(latency_us, Ordering::Relaxed);
     }
-    
+
     fn percentile(&self, p: f64) -> f64 {
         let total = self.total_count.load(Ordering::Relaxed);
         if total == 0 {
             return 0.0;
         }
-        
+
         let target_count = (total as f64 * p / 100.0) as u64;
         let mut cumulative = 0;
-        
+
         for (i, count) in self.counts.iter().enumerate() {
             cumulative += count.load(Ordering::Relaxed);
             if cumulative >= target_count {
                 return self.buckets[i] as f64;
             }
         }
-        
+
         *self.buckets.last().unwrap_or(&0) as f64
     }
-    
+
     fn reset(&self) {
         for count in &self.counts {
             count.store(0, Ordering::Relaxed);
@@ -587,43 +658,44 @@ pub fn new_shared_metrics_collector() -> SharedMetricsCollector {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::time::Duration;
+
+    use super::*;
 
     #[test]
     fn test_metrics_collection() {
         let metrics = MetricsCollector::new();
-        
+
         // Record some operations
         metrics.record_read(Duration::from_micros(100), 1024, true);
         metrics.record_write(Duration::from_micros(200), 2048);
         metrics.record_delete(Duration::from_micros(50));
-        
+
         // Get snapshot
         let snapshot = metrics.snapshot();
-        
+
         assert_eq!(snapshot.operations.reads_total, 1);
         assert_eq!(snapshot.operations.writes_total, 1);
         assert_eq!(snapshot.operations.deletes_total, 1);
         assert_eq!(snapshot.operations.bytes_read, 1024);
         assert_eq!(snapshot.operations.bytes_written, 2048);
         assert_eq!(snapshot.operations.cache_hit_rate, 1.0);
-        
+
         // Test latency percentiles
         assert!(snapshot.latency.read_p50_us > 0.0);
         assert!(snapshot.latency.write_p50_us > 0.0);
         assert!(snapshot.latency.delete_p50_us > 0.0);
     }
-    
+
     #[test]
     fn test_latency_histogram() {
         let histogram = LatencyHistogram::new();
-        
+
         // Record some latencies
-        histogram.record(Duration::from_micros(25));  // Should go to 50us bucket
-        histogram.record(Duration::from_micros(75));  // Should go to 100us bucket
+        histogram.record(Duration::from_micros(25)); // Should go to 50us bucket
+        histogram.record(Duration::from_micros(75)); // Should go to 100us bucket
         histogram.record(Duration::from_micros(150)); // Should go to 500us bucket
-        
+
         assert_eq!(histogram.total_count.load(Ordering::Relaxed), 3);
         assert!(histogram.percentile(50.0) > 0.0);
     }

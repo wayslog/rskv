@@ -1,6 +1,6 @@
 //! # rskv: A High-Performance Key-Value Store in Rust
 //!
-//! `rskv` is a high-performance, concurrent, persistent key-value store inspired by 
+//! `rskv` is a high-performance, concurrent, persistent key-value store inspired by
 //! Microsoft's FASTER. It leverages modern Rust features for safety and performance.
 //!
 //! ## Core Features
@@ -31,23 +31,26 @@
 //! }
 //! ```
 
+#![allow(clippy::uninlined_format_args)]
+
+pub mod background;
+pub mod checkpoint;
 pub mod common;
 pub mod epoch;
+pub mod gc;
 pub mod hlog;
 pub mod index;
-pub mod rskv;
-pub mod checkpoint;
-pub mod gc;
-pub mod background;
 pub mod metrics;
+pub mod rskv;
 
 // Re-export commonly used types
-pub use common::{Address, Key, Value, Config, RsKvError, Result};
-pub use epoch::{EpochManager, EpochHandle, SharedEpochManager};
-
+pub use background::{BackgroundTaskManager, BackgroundTaskStats};
+pub use checkpoint::{CheckpointMetadata, CheckpointState, CheckpointStats};
+pub use common::{Address, Config, Key, Result, RsKvError, Value};
+pub use epoch::{EpochHandle, EpochManager, SharedEpochManager};
+pub use gc::{GcConfig, GcEstimate, GcState, GcStats};
+pub use metrics::{
+    MetricsCollector, MetricsSnapshot, SharedMetricsCollector, new_shared_metrics_collector,
+};
 // Re-export main types
 pub use rskv::{RsKv, RsKvStats};
-pub use checkpoint::{CheckpointState, CheckpointMetadata, CheckpointStats};
-pub use gc::{GcState, GcStats, GcConfig, GcEstimate};
-pub use background::{BackgroundTaskManager, BackgroundTaskStats};
-pub use metrics::{MetricsCollector, MetricsSnapshot, SharedMetricsCollector, new_shared_metrics_collector};

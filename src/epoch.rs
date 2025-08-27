@@ -1,10 +1,11 @@
 //! Epoch-based memory management for rskv
-//! 
+//!
 //! This module provides epoch-based garbage collection and memory reclamation
 //! using crossbeam-epoch. It's inspired by FASTER's light_epoch.h design.
 
-use crossbeam_epoch::{Collector, Guard, LocalHandle};
 use std::sync::Arc;
+
+use crossbeam_epoch::{Collector, Guard, LocalHandle};
 
 /// Epoch manager that provides safe memory reclamation
 /// This is a wrapper around crossbeam-epoch that provides a simpler interface
@@ -78,7 +79,7 @@ impl EpochHandle {
     }
 
     /// Defer destruction with a specific destructor function
-    /// 
+    ///
     /// # Safety
     /// The caller must ensure that the pointer was allocated via Box::into_raw
     /// and is not used elsewhere after this call.
@@ -131,6 +132,10 @@ impl<T> EpochPtr<T> {
 
     /// Get the raw pointer (unsafe)
     /// The caller must ensure they hold an appropriate epoch guard
+    /// Get a raw pointer to the contained value
+    ///
+    /// # Safety
+    /// The caller must ensure that the pointer is not used after the value is dropped
     pub unsafe fn as_ptr(&self) -> *mut T {
         self.ptr
     }
@@ -138,6 +143,10 @@ impl<T> EpochPtr<T> {
     /// Get a reference to the pointed object (unsafe)
     /// The caller must ensure they hold an appropriate epoch guard
     /// and that the pointer is valid
+    /// Get a reference to the contained value
+    ///
+    /// # Safety
+    /// The caller must ensure that the reference is not used after the value is dropped
     pub unsafe fn as_ref(&self) -> Option<&T> {
         if self.ptr.is_null() {
             None
@@ -149,6 +158,10 @@ impl<T> EpochPtr<T> {
     /// Get a mutable reference to the pointed object (unsafe)
     /// The caller must ensure they hold an appropriate epoch guard
     /// and that the pointer is valid and exclusively accessible
+    /// Get a mutable reference to the contained value
+    ///
+    /// # Safety
+    /// The caller must ensure that the reference is not used after the value is dropped
     pub unsafe fn as_mut(&mut self) -> Option<&mut T> {
         if self.ptr.is_null() {
             None
@@ -163,7 +176,7 @@ unsafe impl<T: Sync> Sync for EpochPtr<T> {}
 
 impl<T> Clone for EpochPtr<T> {
     fn clone(&self) -> Self {
-        Self { ptr: self.ptr }
+        *self
     }
 }
 
@@ -192,10 +205,11 @@ pub type SharedEpochManager = Arc<EpochManager>;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread;
+
+    use super::*;
 
     #[test]
     fn test_epoch_manager_creation() {
@@ -214,20 +228,20 @@ mod tests {
     fn test_defer_destruction() {
         let epoch_manager = EpochManager::new();
         let mut handle = epoch_manager.register();
-        
+
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
-        
+
         handle.defer(move || {
             counter_clone.fetch_add(1, Ordering::SeqCst);
         });
-        
+
         // Force garbage collection
         handle.flush();
-        
+
         // Give some time for deferred destruction
         thread::sleep(std::time::Duration::from_millis(10));
-        
+
         // Note: The exact timing of deferred destruction is not guaranteed
         // This test mainly ensures the API works without panicking
     }
@@ -236,15 +250,15 @@ mod tests {
     fn test_epoch_ptr() {
         let value = Box::into_raw(Box::new(42i32));
         let epoch_ptr = EpochPtr::new(value);
-        
+
         assert!(!epoch_ptr.is_null());
-        
+
         unsafe {
             assert_eq!(*epoch_ptr.as_ptr(), 42);
             if let Some(val_ref) = epoch_ptr.as_ref() {
                 assert_eq!(*val_ref, 42);
             }
-            
+
             // Clean up
             drop(Box::from_raw(value));
         }
@@ -254,7 +268,7 @@ mod tests {
     fn test_null_epoch_ptr() {
         let epoch_ptr: EpochPtr<i32> = EpochPtr::null();
         assert!(epoch_ptr.is_null());
-        
+
         unsafe {
             assert!(epoch_ptr.as_ref().is_none());
         }
@@ -263,11 +277,9 @@ mod tests {
     #[test]
     fn test_with_epoch() {
         let epoch_manager = EpochManager::new();
-        
-        let result = epoch_manager.with_epoch(|_guard| {
-            42
-        });
-        
+
+        let result = epoch_manager.with_epoch(|_guard| 42);
+
         assert_eq!(result, 42);
     }
 }

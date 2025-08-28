@@ -27,11 +27,11 @@ pub enum SyncMode {
 pub type Address = u64;
 
 /// Key type for the key-value store.
-/// Using Vec<u8> for maximum flexibility with different key types.
+/// Using `Vec<u8>` for maximum flexibility with different key types.
 pub type Key = Vec<u8>;
 
 /// Value type for the key-value store.
-/// Using Vec<u8> for maximum flexibility with different value types.
+/// Using `Vec<u8>` for maximum flexibility with different value types.
 pub type Value = Vec<u8>;
 
 /// Page size constant - 32MB pages like FASTER

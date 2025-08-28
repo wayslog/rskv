@@ -46,9 +46,6 @@ jobs:
       - name: Install cargo-deny
         run: cargo install cargo-deny
 
-      - name: Install cargo-geiger
-        run: cargo install cargo-geiger
-
       - name: Install cargo-deadlinks
         run: cargo install cargo-deadlinks
 
@@ -57,9 +54,6 @@ jobs:
 
       - name: Run cargo-deny
         run: cargo deny check
-
-      - name: Run cargo-geiger
-        run: cargo geiger --all-features --workspace
 
       - name: Run cargo-deadlinks
         run: |

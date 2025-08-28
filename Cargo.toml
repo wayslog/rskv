@@ -2,6 +2,15 @@
 name = "rskv"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["wayslog <zxs867179@gmail.com>"]
+description = "High-performance KV store inspired by Microsoft FASTER"
+repository = "https://github.com/wayslog/rskv"
+homepage = "https://github.com/wayslog/rskv"
+documentation = "https://docs.rs/rskv"
+readme = "README.md"
+keywords = ["kv", "store", "database", "faster", "high-performance"]
+categories = ["database", "asynchronous", "concurrency"]
 
 [dependencies]
 # 并发和异步支持

@@ -1,0 +1,197 @@
+name: Fuzz Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run fuzz tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  fuzz:
+    name: Fuzz Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: nightly
+        components: rustfmt, clippy
+
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo build
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache fuzz corpus
+      uses: actions/cache@v3
+      with:
+        path: fuzz/corpus
+        key: ${{ runner.os }}-fuzz-corpus-${{ hashFiles('fuzz/**/*') }}
+
+    - name: Install cargo-fuzz
+      run: cargo install cargo-fuzz
+
+    - name: Build fuzz targets
+      run: |
+        cd fuzz
+        cargo fuzz build
+
+    - name: Run fuzz tests (short)
+      run: |
+        cd fuzz
+        timeout 300 cargo fuzz run faster_kv_fuzz -- -max_total_time=300
+      continue-on-error: true
+
+    - name: Run fuzz tests (concurrent)
+      run: |
+        cd fuzz
+        timeout 300 cargo fuzz run concurrent_fuzz -- -max_total_time=300
+      continue-on-error: true
+
+    - name: Upload fuzz artifacts on failure
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: fuzz-artifacts
+        path: fuzz/artifacts/
+
+  fuzz-extended:
+    name: Extended Fuzz Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: nightly
+
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo build
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache fuzz corpus
+      uses: actions/cache@v3
+      with:
+        path: fuzz/corpus
+        key: ${{ runner.os }}-fuzz-corpus-${{ hashFiles('fuzz/**/*') }}
+
+    - name: Install cargo-fuzz
+      run: cargo install cargo-fuzz
+
+    - name: Build fuzz targets
+      run: |
+        cd fuzz
+        cargo fuzz build
+
+    - name: Run extended fuzz tests
+      run: |
+        cd fuzz
+        # Run for 1 hour
+        timeout 3600 cargo fuzz run faster_kv_fuzz -- -max_total_time=3600
+        timeout 3600 cargo fuzz run concurrent_fuzz -- -max_total_time=3600
+      continue-on-error: true
+
+    - name: Upload fuzz artifacts on failure
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: fuzz-artifacts-extended
+        path: fuzz/artifacts/
+
+  fuzz-afl:
+    name: AFL Fuzz Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: nightly
+
+    - name: Install AFL++
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y afl++
+
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo build
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build AFL fuzz targets
+      run: |
+        cd fuzz
+        cargo fuzz build --features afl
+
+    - name: Run AFL fuzz tests
+      run: |
+        cd fuzz
+        mkdir -p corpus/afl
+        timeout 1800 cargo fuzz run faster_kv_fuzz --features afl -- -i corpus/faster_kv_fuzz -o corpus/afl
+      continue-on-error: true
+
+    - name: Upload AFL artifacts on failure
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: afl-artifacts
+        path: fuzz/corpus/afl/

@@ -1,0 +1,62 @@
+# Rust编译产物
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo
+Cargo.lock
+
+# IDE和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统生成的文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+
+# 测试覆盖率报告
+tarpaulin-report.html
+coverage/
+
+# 性能分析文件
+*.prof
+perf.data*
+
+# 文档生成
+/doc/
+
+# 备份文件
+*.bak
+*.backup
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 模糊测试相关
+/fuzz/artifacts/
+/fuzz/corpus/
+/fuzz/target/
+
+# 其他构建产物
+*.o
+*.so
+*.dylib
+*.dll
+*.exe

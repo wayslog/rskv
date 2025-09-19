@@ -1,0 +1,9 @@
+# Clippy configuration file
+# See: https://doc.rust-lang.org/clippy/configuration.html
+
+# Allow some lints that are too strict for this project
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-unwrap-in-tests = true
+allow-print-in-tests = true
+allow-dbg-in-tests = true

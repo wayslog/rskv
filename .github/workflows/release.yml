@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo build
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build release
+      run: cargo build --release --all-features
+
+    - name: Run tests
+      run: cargo test --release --all-features
+
+    - name: Create release archive
+      run: |
+        tar -czf rskv-${{ github.ref_name }}.tar.gz target/release/rskv
+        tar -czf rskv-src-${{ github.ref_name }}.tar.gz --exclude=target --exclude=.git .
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          rskv-${{ github.ref_name }}.tar.gz
+          rskv-src-${{ github.ref_name }}.tar.gz
+        generate_release_notes: true
+        draft: false
+        prerelease: false

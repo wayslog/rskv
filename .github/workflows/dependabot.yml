@@ -1,0 +1,56 @@
+name: Dependabot
+
+on:
+  schedule:
+    # Check for updates weekly on Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  check-updates:
+    name: Check for dependency updates
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Install cargo-outdated
+      run: cargo install cargo-outdated
+
+    - name: Check for outdated dependencies
+      run: cargo outdated --exit-code 1
+      continue-on-error: true
+
+    - name: Create issue for outdated dependencies
+      if: failure()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const title = 'Dependency Update Available';
+          const body = `Some dependencies have updates available. Please review and update them.
+          
+          Run \`cargo outdated\` to see the full list of outdated dependencies.`;
+          
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            state: 'open',
+            labels: 'dependencies'
+          });
+          
+          const existingIssue = issues.data.find(issue => issue.title === title);
+          
+          if (!existingIssue) {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['dependencies', 'maintenance']
+            });
+          }

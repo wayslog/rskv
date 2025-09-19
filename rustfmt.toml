@@ -1,0 +1,18 @@
+# Rustfmt configuration file
+# See: https://rust-lang.github.io/rustfmt/
+
+# Basic formatting
+edition = "2021"
+max_width = 100
+tab_spaces = 4
+newline_style = "Unix"
+
+# Imports
+reorder_imports = true
+
+# Functions and items
+fn_params_layout = "Tall"
+
+# Other
+use_field_init_shorthand = true
+use_try_shorthand = true

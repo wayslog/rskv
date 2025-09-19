@@ -1,0 +1,10 @@
+[package]
+name = "rskv"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+crossbeam-epoch = "0.9"
+static_assertions = "1.1.0"
+log = "0.4"
+rand = "0.8"

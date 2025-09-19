@@ -1,0 +1,115 @@
+# Tarpaulin configuration file
+# See: https://docs.rs/cargo-tarpaulin/latest/cargo_tarpaulin/config/
+
+[tool.tarpaulin]
+# Output formats
+out = ["Xml", "Html", "Stdout"]
+
+# Coverage thresholds
+fail_under = 80.0
+
+# Exclude patterns
+exclude_files = [
+    "*/target/*",
+    "*/examples/*",
+    "*/tests/*",
+    "*/benches/*",
+    "*/fuzz/*",
+    "*/fuzz_targets/*",
+]
+
+# Include patterns
+include_files = [
+    "src/**/*.rs",
+]
+
+# Test configuration
+test_args = ["--all-features"]
+features = ["all"]
+
+# Output directory
+output_dir = "coverage"
+
+# Timeout for tests
+timeout = 300
+
+# Verbose output
+verbose = true
+
+# Generate HTML report
+html = true
+
+# Generate XML report for Codecov
+xml = true
+
+# Line coverage
+line = true
+
+# Branch coverage
+branch = true
+
+# Function coverage
+function = true
+
+# Region coverage
+region = true
+
+# Count hits
+count = true
+
+# Show missing
+show_missing = true
+
+# Show partial
+show_partial = true
+
+# Show uncovered
+show_uncovered = true
+
+# Show covered
+show_covered = true
+
+# Show branches
+show_branches = true
+
+# Show functions
+show_functions = true
+
+# Show regions
+show_regions = true
+
+# Show lines
+show_lines = true
+
+# Show hits
+show_hits = true
+
+# Show misses
+show_misses = true
+
+# Show partial hits
+show_partial_hits = true
+
+# Show uncovered lines
+show_uncovered_lines = true
+
+# Show covered lines
+show_covered_lines = true
+
+# Show uncovered branches
+show_uncovered_branches = true
+
+# Show covered branches
+show_covered_branches = true
+
+# Show uncovered functions
+show_uncovered_functions = true
+
+# Show covered functions
+show_covered_functions = true
+
+# Show uncovered regions
+show_uncovered_regions = true
+
+# Show covered regions
+show_covered_regions = true

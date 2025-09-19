@@ -3,6 +3,22 @@ name = "rskv"
 version = "0.1.0"
 edition = "2024"
 
+[[example]]
+name = "f2_basic_example"
+path = "examples/f2_basic_example.rs"
+
+[[example]]
+name = "f2_cold_hot_migration_test"
+path = "examples/f2_cold_hot_migration_test.rs"
+
+[[example]]
+name = "f2_comprehensive_test"
+path = "examples/f2_comprehensive_test.rs"
+
+[[example]]
+name = "f2_migration_stress_test"
+path = "examples/f2_migration_stress_test.rs"
+
 [dependencies]
 crossbeam-epoch = "0.9"
 static_assertions = "1.1.0"

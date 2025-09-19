@@ -11,10 +11,6 @@ updates:
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 10
-    reviewers:
-      - "xuesong.zhao"
-    assignees:
-      - "xuesong.zhao"
     commit-message:
       prefix: "deps"
       include: "scope"
@@ -36,10 +32,6 @@ updates:
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 5
-    reviewers:
-      - "xuesong.zhao"
-    assignees:
-      - "xuesong.zhao"
     commit-message:
       prefix: "ci"
       include: "scope"

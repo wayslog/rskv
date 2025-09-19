@@ -6,6 +6,9 @@ use crate::index::IHashIndex;
 use crate::index::mem_index::FindContext;
 use std::marker::PhantomData;
 
+#[cfg(test)]
+mod tests;
+
 // Redefine FasterKv with a specific index type for clarity.
 pub type HotStore<'a, K, V> = FasterKv<'a, K, V, FileSystemDisk>;
 pub type ColdStore<'a, K, V> = FasterKv<'a, K, V, FileSystemDisk>; // This is conceptually the cold store.

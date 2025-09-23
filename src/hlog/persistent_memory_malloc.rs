@@ -134,6 +134,7 @@ impl AtomicPageOffset {
         }
     }
 
+    #[allow(dead_code)]
     fn new_page(&self, old_page: u32) -> bool {
         let expected = self.load();
         if old_page != expected.page() {
@@ -377,7 +378,14 @@ impl<'epoch, D: Disk> PersistentMemoryMalloc<'epoch, D> {
             }
 
             // Allocate new page
-            let layout = Layout::from_size_align(self.page_size as usize, 64).unwrap();
+            let layout = match Layout::from_size_align(self.page_size as usize, 64) {
+                Ok(layout) => layout,
+                Err(_) => {
+                    // This should never happen with valid page_size and alignment
+                    log::error!("Invalid layout parameters: size={}, align=64", self.page_size);
+                    return;
+                }
+            };
             let new_page = unsafe { aligned_alloc(layout) };
             if !new_page.is_null() {
                 // Zero out the page
@@ -395,12 +403,28 @@ impl<'epoch, D: Disk> PersistentMemoryMalloc<'epoch, D> {
     }
 
     pub fn checkpoint(&mut self, _disk: &mut D, _token: &str) -> Result<LogMetadata, Status> {
-        // Simplified checkpoint implementation
-        Ok(LogMetadata {
-            version: 1,
-            flushed_address: self.flushed_until_address.load(Ordering::Acquire),
-            final_address: self.head_address.load(Ordering::Acquire),
-        })
+        // Get current addresses
+        let flushed_address = self.flushed_until_address.load(Ordering::Acquire);
+        let final_address = self.head_address.load(Ordering::Acquire);
+
+        // Calculate approximate record count and data size
+        // This is a simplified estimation - in a real implementation,
+        // we would track these metrics more precisely
+        let data_size = final_address.control() - flushed_address.control();
+        let estimated_record_count = data_size / 64; // Rough estimate assuming average record size
+
+        let mut metadata = LogMetadata::new(
+            1,
+            flushed_address,
+            final_address,
+            estimated_record_count,
+            data_size,
+        );
+
+        // Update checksum
+        metadata.update_checksum();
+
+        Ok(metadata)
     }
 
     pub fn recover(

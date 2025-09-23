@@ -13,6 +13,7 @@ use crate::index::mem_index::FindContext;
 struct ColdIndexRead<'a> {
     key: HashIndexChunkKey,
     original_context: &'a mut FindContext,
+    #[allow(dead_code)]
     index_in_chunk: u8,
     tag_in_chunk: u8,
 }

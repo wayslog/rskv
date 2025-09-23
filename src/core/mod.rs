@@ -4,6 +4,8 @@ pub mod async_context;
 pub mod checkpoint;
 pub mod constants;
 pub mod light_epoch;
+pub mod lockable_record;
+pub mod locking;
 pub mod malloc_fixed_page_size;
 pub mod phase;
 pub mod record;

@@ -1,5 +1,6 @@
 use crate::core::checkpoint::{CheckpointMetadata, IndexMetadata};
 use crate::core::light_epoch::LightEpoch;
+use std::sync::atomic::Ordering;
 use crate::core::record::{Record, RecordInfo};
 use crate::core::status::Status;
 use crate::device::file_system_disk::FileSystemDisk;
@@ -551,18 +552,20 @@ where
         let log_metadata = self.hlog.checkpoint(&mut self.disk, token)?;
 
         // 2. Orchestrate Index Checkpoint
-        // For now, we'll create a dummy FileSystemDisk for the checkpoint
-        // In a real implementation, we'd need to handle this differently
-        let _dummy_disk = FileSystemDisk::new("/tmp")?;
-        // Temporarily skip index checkpoint to avoid file system issues
-        let mut index_metadata = IndexMetadata::default();
-        index_metadata.table_size = self.index.size();
+        use crate::core::checkpoint::CheckpointType;
+        let mut index_metadata = IndexMetadata::new(
+            1, // version
+            self.index.size(),
+            CheckpointType::Full,
+        );
+
+        // Set additional metadata
+        index_metadata.log_begin_address = self.hlog.begin_address.load(Ordering::Acquire);
+        index_metadata.checkpoint_start_address = self.hlog.head_address.load(Ordering::Acquire);
+        index_metadata.update_checksum();
 
         // 3. Write final metadata file
-        let metadata = CheckpointMetadata {
-            index_metadata,
-            log_metadata,
-        };
+        let metadata = CheckpointMetadata::new(index_metadata, log_metadata);
         let path = self.disk.index_checkpoint_path(token);
 
         // Ensure directory exists

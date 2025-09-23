@@ -16,7 +16,8 @@ impl FileSystemDisk {
             std::fs::create_dir_all(path).map_err(|_| Status::IoError)?;
         }
         let log_path = path.join("hlog.log");
-        let mut log = File::new(log_path.to_str().unwrap());
+        let log_path_str = log_path.to_str().ok_or(Status::IoError)?;
+        let mut log = File::new(log_path_str);
         let status = log.open(FileCreateDisposition::OpenOrCreate, FileOptions::default());
         if status.is_err() {
             return Err(Status::IoError);

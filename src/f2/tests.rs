@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::core::status::Status;
     use crate::f2::F2Kv;
     use crate::faster::{ReadContext, UpsertContext, RmwContext};

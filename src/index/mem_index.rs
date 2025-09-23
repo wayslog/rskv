@@ -65,7 +65,7 @@ impl<'epoch> HotLogMemHashIndex<'epoch> {
         unsafe {
             self.table[0].initialize(table_size, alignment);
         }
-        self.overflow_buckets_allocator[0].initialize(alignment, self.epoch.unwrap());
+        self.overflow_buckets_allocator[0].initialize(alignment, epoch);
         self.version = 0;
     }
 
@@ -118,9 +118,11 @@ impl<'epoch> HotLogMemHashIndex<'epoch> {
                         context.entry = HashBucketEntry::default();
                         context.atomic_entry = Some(&new_bucket.entries[0]);
                     } else {
-                        let guard = self.epoch.as_ref().unwrap().protect();
-                        self.overflow_buckets_allocator[version]
-                            .free_at_epoch(new_bucket_addr, &guard);
+                        if let Some(epoch) = self.epoch.as_ref() {
+                            let guard = epoch.protect();
+                            self.overflow_buckets_allocator[version]
+                                .free_at_epoch(new_bucket_addr, &guard);
+                        }
                         context.atomic_entry = None;
                     }
                 }

@@ -140,8 +140,10 @@ impl<T: Sized + Default> FixedPageArray<T> {
     }
 
     fn add_page(&self, page_idx: u64) -> *mut FixedPage<T> {
-        let layout =
-            Layout::from_size_align(std::mem::size_of::<FixedPage<T>>(), self.alignment).unwrap();
+        let layout = match Layout::from_size_align(std::mem::size_of::<FixedPage<T>>(), self.alignment) {
+            Ok(layout) => layout,
+            Err(_) => return ptr::null_mut(), // Invalid alignment
+        };
         let new_page_ptr = unsafe { aligned_alloc(layout) as *mut FixedPage<T> };
         unsafe { ptr::write(new_page_ptr, FixedPage::default()) };
 
@@ -165,8 +167,15 @@ impl<T: Sized + Default> FixedPageArray<T> {
 
 impl<T: Sized + Default> Drop for FixedPageArray<T> {
     fn drop(&mut self) {
-        let layout =
-            Layout::from_size_align(std::mem::size_of::<FixedPage<T>>(), self.alignment).unwrap();
+        let layout = match Layout::from_size_align(std::mem::size_of::<FixedPage<T>>(), self.alignment) {
+            Ok(layout) => layout,
+            Err(_) => {
+                // If we can't create the layout, we can't safely free the memory
+                // This should never happen if the array was created successfully
+                log::error!("Cannot create layout during drop - potential memory leak");
+                return;
+            }
+        };
         for page_ptr in self.pages.iter() {
             let ptr = page_ptr.load(Ordering::Relaxed);
             if !ptr.is_null() {
@@ -180,6 +189,7 @@ impl<T: Sized + Default> Drop for FixedPageArray<T> {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct FreeAddress {
     addr: FixedPageAddress,
     removal_epoch: u64,
@@ -315,17 +325,25 @@ impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
     }
 
     pub fn allocate(&self) -> FixedPageAddress {
-        // Check free list first with epoch safety
-        if let Some(epoch) = self.epoch {
-            let guard = epoch.protect();
-            if let Some(freed_addr) = self.try_allocate_from_free_list(&guard) {
-                return freed_addr;
+        let epoch = match self.epoch {
+            Some(epoch) => epoch,
+            None => {
+                // If epoch is not set, just allocate without epoch protection
+                let addr = self.count.fetch_add(1, Ordering::Relaxed);
+                let array = unsafe { &*self.page_array.load(Ordering::Acquire) };
+                array.get_or_add(addr.page());
+                return addr;
             }
+        };
+
+        // Check free list first with epoch safety
+        let guard = epoch.protect();
+        if let Some(freed_addr) = self.try_allocate_from_free_list(&guard) {
+            return freed_addr;
         }
 
         // Fallback to allocating new
         let addr = self.count.fetch_add(1, Ordering::Relaxed);
-        let guard = self.epoch.unwrap().protect();
         let mut array = unsafe { &*self.page_array.load(Ordering::Acquire) };
 
         if addr.page() >= array.size() {

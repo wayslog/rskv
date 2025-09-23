@@ -95,13 +95,25 @@ where
 {
     /// Calculates the required size for a record with the given key and value.
     pub fn required_size() -> u32 {
-        let layout = std::alloc::Layout::new::<Self>()
-            .extend(std::alloc::Layout::new::<K>())
-            .unwrap()
-            .0
-            .extend(std::alloc::Layout::new::<V>())
-            .unwrap()
-            .0;
+        // Calculate layout for RecordInfo + Key + Value
+        let record_layout = std::alloc::Layout::new::<Self>();
+        let key_layout = std::alloc::Layout::new::<K>();
+        let value_layout = std::alloc::Layout::new::<V>();
+
+        // These operations should never fail for valid types, but we handle errors gracefully
+        let layout = match record_layout.extend(key_layout) {
+            Ok((layout, _)) => match layout.extend(value_layout) {
+                Ok((final_layout, _)) => final_layout,
+                Err(_) => {
+                    // Fallback to sum of individual sizes
+                    return (record_layout.size() + key_layout.size() + value_layout.size()) as u32;
+                }
+            },
+            Err(_) => {
+                // Fallback to sum of individual sizes
+                return (record_layout.size() + key_layout.size() + value_layout.size()) as u32;
+            }
+        };
         layout.pad_to_align().size() as u32
     }
 

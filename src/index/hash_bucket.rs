@@ -16,6 +16,7 @@ impl HashBucketEntry {
     const ADDRESS_BITS: u32 = 47;
     const READCACHE_BIT: u32 = 1;
     const TAG_BITS: u32 = 14;
+    #[allow(dead_code)]
     const TENTATIVE_BIT: u32 = 1;
 
     const ADDRESS_MASK: u64 = (1 << Self::ADDRESS_BITS) - 1;

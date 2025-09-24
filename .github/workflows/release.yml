@@ -48,7 +48,7 @@ jobs:
         tar -czf rskv-src-${{ github.ref_name }}.tar.gz --exclude=target --exclude=.git .
 
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           rskv-${{ github.ref_name }}.tar.gz

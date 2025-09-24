@@ -6,17 +6,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Types of checkpoints supported
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
+#[derive(Default)]
 pub enum CheckpointType {
     /// Full checkpoint containing all data
+    #[default]
     Full = 0,
     /// Incremental checkpoint containing only changes since last checkpoint
     Incremental = 1,
-}
-
-impl Default for CheckpointType {
-    fn default() -> Self {
-        CheckpointType::Full
-    }
 }
 
 /// Checkpoint metadata for the index itself.
@@ -113,11 +109,10 @@ impl CheckpointMetadata {
         }
 
         // Check timestamp consistency
-        let time_diff = if self.index_metadata.timestamp > self.log_metadata.timestamp {
-            self.index_metadata.timestamp - self.log_metadata.timestamp
-        } else {
-            self.log_metadata.timestamp - self.index_metadata.timestamp
-        };
+        let time_diff = self
+            .index_metadata
+            .timestamp
+            .abs_diff(self.log_metadata.timestamp);
 
         // Allow up to 10 seconds difference
         if time_diff > 10_000_000_000 {
@@ -129,12 +124,16 @@ impl CheckpointMetadata {
 
     /// Gets the minimum timestamp between index and log
     pub fn min_timestamp(&self) -> u64 {
-        self.index_metadata.timestamp.min(self.log_metadata.timestamp)
+        self.index_metadata
+            .timestamp
+            .min(self.log_metadata.timestamp)
     }
 
     /// Gets the maximum timestamp between index and log
     pub fn max_timestamp(&self) -> u64 {
-        self.index_metadata.timestamp.max(self.log_metadata.timestamp)
+        self.index_metadata
+            .timestamp
+            .max(self.log_metadata.timestamp)
     }
 
     /// Checks if this is an incremental checkpoint
@@ -145,11 +144,7 @@ impl CheckpointMetadata {
 
 impl IndexMetadata {
     /// Creates a new index metadata with current timestamp
-    pub fn new(
-        version: u32,
-        table_size: u64,
-        checkpoint_type: CheckpointType,
-    ) -> Self {
+    pub fn new(version: u32, table_size: u64, checkpoint_type: CheckpointType) -> Self {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()

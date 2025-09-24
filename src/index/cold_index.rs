@@ -90,10 +90,8 @@ impl<'epoch> IHashIndex<'epoch> for ColdIndex<'epoch> {
         };
 
         let status = self.internal_kv.read(&mut read_context);
-        if status == Status::Ok {
-            if read_context.original_context.entry.unused() {
-                return Status::NotFound;
-            }
+        if status == Status::Ok && read_context.original_context.entry.unused() {
+            return Status::NotFound;
         }
         status
     }

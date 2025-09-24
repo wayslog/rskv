@@ -184,7 +184,7 @@ where
 
             // Verify alignment
             debug_assert!(
-                record_ptr as usize % max_alignment == 0,
+                (record_ptr as usize).is_multiple_of(max_alignment),
                 "Record pointer not properly aligned: {:p} (alignment: {})",
                 record_ptr,
                 max_alignment
@@ -223,6 +223,12 @@ where
     }
 
     /// Returns a reference to the value from a record pointer.
+    ///
+    /// # Safety
+    /// The caller must ensure that:
+    /// - `record_ptr` is a valid, non-null pointer to a properly initialized `Record<K, V>`
+    /// - The record pointed to by `record_ptr` is properly aligned
+    /// - The memory is accessible for reading for the lifetime 'a
     pub unsafe fn value<'a>(record_ptr: *const Self) -> &'a V {
         unsafe {
             // Use a simpler approach: calculate the value position based on the record layout
@@ -241,6 +247,13 @@ where
     }
 
     /// Returns a mutable reference to the value from a record pointer.
+    ///
+    /// # Safety
+    /// The caller must ensure that:
+    /// - `record_ptr` is a valid, non-null pointer to a properly initialized `Record<K, V>`
+    /// - The record pointed to by `record_ptr` is properly aligned
+    /// - The memory is accessible for writing for the lifetime 'a
+    /// - No other references to the same memory exist
     pub unsafe fn value_mut<'a>(record_ptr: *mut Self) -> &'a mut V {
         unsafe {
             // Use a simpler approach: calculate the value position based on the record layout

@@ -20,6 +20,12 @@ pub struct InternalHashTable<D: HashIndexDefinition> {
 unsafe impl<D: HashIndexDefinition> Send for InternalHashTable<D> {}
 unsafe impl<D: HashIndexDefinition> Sync for InternalHashTable<D> {}
 
+impl<D: HashIndexDefinition> Default for InternalHashTable<D> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<D: HashIndexDefinition> InternalHashTable<D> {
     /// Creates a new, uninitialized hash table.
     pub fn new() -> Self {

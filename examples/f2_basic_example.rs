@@ -1,6 +1,6 @@
 use rskv::core::status::Status;
 use rskv::f2::F2Kv;
-use rskv::faster::{ReadContext, UpsertContext, RmwContext};
+use rskv::faster::{ReadContext, RmwContext, UpsertContext};
 use std::path::Path;
 
 // 简单的测试数据结构
@@ -111,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 创建临时目录
     let hot_dir = "/tmp/f2_hot_test";
     let cold_dir = "/tmp/f2_cold_test";
-    
+
     for dir in [hot_dir, cold_dir] {
         if Path::new(dir).exists() {
             std::fs::remove_dir_all(dir)?;
@@ -206,7 +206,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n 测试5: 冷存储数据写入");
     // 注意：这里我们无法直接访问冷存储，但可以通过F2的机制来测试
     // 在实际场景中，冷存储数据通常是通过数据迁移或老化策略产生的
-    
+
     // 测试6: 批量操作测试
     println!("\n 测试6: 批量操作测试");
     let mut success_count = 0;
@@ -241,14 +241,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             value: None,
         };
         let read_status = f2_kv.read(&mut read_ctx);
-        
+
         // RMW
         let mut rmw_ctx = TestRmwContext {
             key: i,
             increment: 1,
         };
         let rmw_status = f2_kv.rmw(&mut rmw_ctx);
-        
+
         println!("  Key {}: 读取={:?}, RMW={:?}", i, read_status, rmw_status);
     }
 

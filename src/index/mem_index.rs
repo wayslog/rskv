@@ -46,6 +46,12 @@ impl FindContext {
 // We implement methods specifically for the HotLog definition for now.
 type HotLogMemHashIndex<'epoch> = MemHashIndex<'epoch, HotLogHashIndexDefinition>;
 
+impl<'epoch> Default for HotLogMemHashIndex<'epoch> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'epoch> HotLogMemHashIndex<'epoch> {
     pub fn size(&self) -> u64 {
         self.table[self.version as usize].size()
@@ -107,7 +113,9 @@ impl<'epoch> HotLogMemHashIndex<'epoch> {
                 } else {
                     // Chain is full, need to allocate a new bucket
                     let new_bucket_addr = self.overflow_buckets_allocator[version].allocate();
-                    let new_bucket = self.overflow_buckets_allocator[version].get(new_bucket_addr);
+                    let new_bucket = unsafe {
+                        self.overflow_buckets_allocator[version].get_unchecked(new_bucket_addr)
+                    };
                     let new_overflow_entry = HashBucketOverflowEntry::new(new_bucket_addr);
 
                     if bucket
@@ -128,7 +136,9 @@ impl<'epoch> HotLogMemHashIndex<'epoch> {
                 }
                 return;
             }
-            bucket = self.overflow_buckets_allocator[version].get(overflow_entry.address());
+            bucket = unsafe {
+                self.overflow_buckets_allocator[version].get_unchecked(overflow_entry.address())
+            };
         }
     }
 
@@ -279,7 +289,9 @@ impl<'epoch> IHashIndex<'epoch> for HotLogMemHashIndex<'epoch> {
             if overflow_entry.unused() {
                 break; // End of chain
             }
-            bucket = self.overflow_buckets_allocator[version].get(overflow_entry.address());
+            bucket = unsafe {
+                self.overflow_buckets_allocator[version].get_unchecked(overflow_entry.address())
+            };
         }
 
         context.entry = HashBucketEntry::default();

@@ -15,7 +15,7 @@ impl HashIndexChunkKey {
 }
 
 /// The value stored in the internal KV for ColdIndex, representing a chunk of buckets.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 #[repr(C)]
 pub struct HashIndexChunkValue {
     // For now, let's define a chunk as a single bucket.
@@ -30,12 +30,4 @@ pub struct ColdIndexRmwContext {
     pub tag_in_chunk: u8,
     pub new_entry: HashBucketEntry,
     pub expected_entry: HashBucketEntry,
-}
-
-impl Default for HashIndexChunkValue {
-    fn default() -> Self {
-        Self {
-            bucket: Default::default(),
-        }
-    }
 }

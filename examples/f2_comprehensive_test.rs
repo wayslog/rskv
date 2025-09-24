@@ -1,10 +1,10 @@
 use rskv::core::status::Status;
 use rskv::f2::F2Kv;
-use rskv::faster::{ReadContext, UpsertContext, RmwContext};
+use rskv::faster::{ReadContext, RmwContext, UpsertContext};
 use std::path::Path;
+use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
-use std::sync::Arc;
 
 // 复杂测试数据结构
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -137,14 +137,14 @@ impl RmwContext for ComplexRmwContext {
 // 测试F2的基本功能
 fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
     println!("🔧 测试F2基本操作");
-    
+
     // 测试写入
     let test_data = ComplexTestData::new(1, 1000);
     let upsert_ctx = ComplexUpsertContext {
         key: 1,
         value: test_data,
     };
-    
+
     let status = f2_kv.upsert(&upsert_ctx);
     assert_eq!(status, Status::Ok);
     println!("   写入操作成功");
@@ -154,7 +154,7 @@ fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
         key: 1,
         value: None,
     };
-    
+
     let status = f2_kv.read(&mut read_ctx);
     // 由于F2的实现，读取可能返回NotFound，这是正常的
     if status == Status::Ok {
@@ -170,7 +170,7 @@ fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
         increment: 500,
         metadata_update: 2000,
     };
-    
+
     let status = f2_kv.rmw(&mut rmw_ctx);
     assert_eq!(status, Status::Ok);
     println!("   RMW操作成功");
@@ -180,14 +180,17 @@ fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
         key: 1,
         value: None,
     };
-    
+
     let status = f2_kv.read(&mut read_ctx);
     if status == Status::Ok {
         if let Some(data) = read_ctx.value {
             // RMW后的值应该是increment值（因为RMW创建新数据）
             assert_eq!(data.value, 500); // RMW的increment值
             assert_eq!(data.metadata, 2000);
-            println!("   RMW结果验证成功: value={}, metadata={}", data.value, data.metadata);
+            println!(
+                "   RMW结果验证成功: value={}, metadata={}",
+                data.value, data.metadata
+            );
         }
     } else {
         println!("   RMW后读取失败: {:?}", status);
@@ -197,7 +200,7 @@ fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
 // 测试冷热数据迁移场景
 fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
     println!("\n 测试冷热数据迁移场景");
-    
+
     // 场景1: 大量数据写入，模拟热数据
     println!("  📝 场景1: 大量热数据写入");
     for i in 1..=100 {
@@ -219,7 +222,7 @@ fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
                 value: None,
             };
             f2_kv.read(&mut read_ctx);
-            
+
             let mut rmw_ctx = ComplexRmwContext {
                 key: i,
                 increment: 1,
@@ -248,7 +251,7 @@ fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
         increment: 1000,
         metadata_update: 50000,
     };
-    
+
     let status = f2_kv.rmw(&mut rmw_ctx);
     assert_eq!(status, Status::Ok);
     println!("     冷数据RMW操作成功，可能触发迁移");
@@ -258,43 +261,40 @@ fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
         key: 50,
         value: None,
     };
-    
+
     let status = f2_kv.read(&mut read_ctx);
     assert_eq!(status, Status::Ok);
     if let Some(data) = read_ctx.value {
-        println!("     迁移后数据: value={}, metadata={}", data.value, data.metadata);
+        println!(
+            "     迁移后数据: value={}, metadata={}",
+            data.value, data.metadata
+        );
     }
 }
 
 // 测试并发访问（简化版本）
 fn test_concurrent_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
     println!("\n 测试并发操作");
-    
+
     let num_operations = 400; // 8 * 50
     let mut total_success = 0;
-    
+
     for i in 1..=num_operations {
         let key = i;
-        
+
         // 写入操作
         let data = ComplexTestData::new(key, key * 100);
-        let upsert_ctx = ComplexUpsertContext {
-            key,
-            value: data,
-        };
+        let upsert_ctx = ComplexUpsertContext { key, value: data };
         if f2_kv.upsert(&upsert_ctx) == Status::Ok {
             total_success += 1;
         }
-        
+
         // 读取操作
-        let mut read_ctx = ComplexReadContext {
-            key,
-            value: None,
-        };
+        let mut read_ctx = ComplexReadContext { key, value: None };
         if f2_kv.read(&mut read_ctx) == Status::Ok {
             total_success += 1;
         }
-        
+
         // RMW操作
         let mut rmw_ctx = ComplexRmwContext {
             key,
@@ -305,16 +305,16 @@ fn test_concurrent_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
             total_success += 1;
         }
     }
-    
+
     println!("   并发模拟测试完成: {} 总操作成功", total_success);
 }
 
 // 性能基准测试
 fn performance_benchmark(f2_kv: &F2Kv<u64, ComplexTestData>) {
     println!("\n 性能基准测试");
-    
+
     let num_operations = 10000;
-    
+
     // 写入性能测试
     let write_start = Instant::now();
     for i in 1..=num_operations {
@@ -326,7 +326,7 @@ fn performance_benchmark(f2_kv: &F2Kv<u64, ComplexTestData>) {
         f2_kv.upsert(&upsert_ctx);
     }
     let write_duration = write_start.elapsed();
-    
+
     // 读取性能测试
     let read_start = Instant::now();
     for i in 1..=num_operations {
@@ -337,7 +337,7 @@ fn performance_benchmark(f2_kv: &F2Kv<u64, ComplexTestData>) {
         f2_kv.read(&mut read_ctx);
     }
     let read_duration = read_start.elapsed();
-    
+
     // RMW性能测试
     let rmw_start = Instant::now();
     for i in 1..=num_operations {
@@ -349,42 +349,45 @@ fn performance_benchmark(f2_kv: &F2Kv<u64, ComplexTestData>) {
         f2_kv.rmw(&mut rmw_ctx);
     }
     let rmw_duration = rmw_start.elapsed();
-    
-    println!("   写入性能: {} 操作/秒", num_operations as f64 / write_duration.as_secs_f64());
-    println!("   读取性能: {} 操作/秒", num_operations as f64 / read_duration.as_secs_f64());
-    println!("   RMW性能: {} 操作/秒", num_operations as f64 / rmw_duration.as_secs_f64());
+
+    println!(
+        "   写入性能: {} 操作/秒",
+        num_operations as f64 / write_duration.as_secs_f64()
+    );
+    println!(
+        "   读取性能: {} 操作/秒",
+        num_operations as f64 / read_duration.as_secs_f64()
+    );
+    println!(
+        "   RMW性能: {} 操作/秒",
+        num_operations as f64 / rmw_duration.as_secs_f64()
+    );
 }
 
 // 压力测试
 fn stress_test(f2_kv: &F2Kv<u64, ComplexTestData>) {
     println!("\n 压力测试");
-    
+
     let num_operations = 16000; // 16 * 1000
     let start_time = Instant::now();
     let mut total_success = 0;
-    
+
     for i in 1..=num_operations {
         let key = i;
-        
+
         // 随机选择操作类型
         match i % 3 {
             0 => {
                 // 写入
                 let data = ComplexTestData::new(key, key * 100);
-                let upsert_ctx = ComplexUpsertContext {
-                    key,
-                    value: data,
-                };
+                let upsert_ctx = ComplexUpsertContext { key, value: data };
                 if f2_kv.upsert(&upsert_ctx) == Status::Ok {
                     total_success += 1;
                 }
             }
             1 => {
                 // 读取
-                let mut read_ctx = ComplexReadContext {
-                    key,
-                    value: None,
-                };
+                let mut read_ctx = ComplexReadContext { key, value: None };
                 if f2_kv.read(&mut read_ctx) == Status::Ok {
                     total_success += 1;
                 }
@@ -402,16 +405,22 @@ fn stress_test(f2_kv: &F2Kv<u64, ComplexTestData>) {
             }
         }
     }
-    
+
     let duration = start_time.elapsed();
     let total_operations = num_operations;
-    
+
     println!("   压力测试完成:");
     println!("    - 总操作数: {}", total_operations);
     println!("    - 成功操作数: {}", total_success);
-    println!("    - 成功率: {:.2}%", (total_success as f64 / total_operations as f64) * 100.0);
+    println!(
+        "    - 成功率: {:.2}%",
+        (total_success as f64 / total_operations as f64) * 100.0
+    );
     println!("    - 总耗时: {:?}", duration);
-    println!("    - 吞吐量: {:.2} 操作/秒", total_operations as f64 / duration.as_secs_f64());
+    println!(
+        "    - 吞吐量: {:.2} 操作/秒",
+        total_operations as f64 / duration.as_secs_f64()
+    );
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -421,7 +430,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 创建临时目录
     let hot_dir = "/tmp/f2_comprehensive_hot";
     let cold_dir = "/tmp/f2_comprehensive_cold";
-    
+
     for dir in [hot_dir, cold_dir] {
         if Path::new(dir).exists() {
             std::fs::remove_dir_all(dir)?;

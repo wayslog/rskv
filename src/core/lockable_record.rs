@@ -1,8 +1,8 @@
 /// Lockable record wrapper that provides fine-grained locking for FASTER-style operations
-use crate::core::locking::{RecordLock, SharedLockGuard, ExclusiveLockGuard};
+use crate::core::locking::{ExclusiveLockGuard, RecordLock, SharedLockGuard};
 use crate::core::record::{Record, RecordInfo};
-use std::sync::atomic::{AtomicPtr, Ordering};
 use std::ptr;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 /// A lockable wrapper around a Record that provides fine-grained concurrency control
 pub struct LockableRecord<K, V>
@@ -14,6 +14,16 @@ where
     record_ptr: AtomicPtr<Record<K, V>>,
     /// The lock for this record
     lock: RecordLock,
+}
+
+impl<K, V> Default for LockableRecord<K, V>
+where
+    K: Sized + Copy,
+    V: Sized + Copy,
+{
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<K, V> LockableRecord<K, V>
@@ -36,21 +46,17 @@ where
 
     /// Attempts to acquire a shared lock for reading
     pub fn try_read(&self) -> Option<LockableRecordReadGuard<'_, K, V>> {
-        SharedLockGuard::new(&self.lock).map(|guard| {
-            LockableRecordReadGuard {
-                record_ptr: &self.record_ptr,
-                _lock_guard: guard,
-            }
+        SharedLockGuard::new(&self.lock).map(|guard| LockableRecordReadGuard {
+            record_ptr: &self.record_ptr,
+            _lock_guard: guard,
         })
     }
 
     /// Attempts to acquire an exclusive lock for writing
     pub fn try_write(&self) -> Option<LockableRecordWriteGuard<'_, K, V>> {
-        ExclusiveLockGuard::new(&self.lock).map(|guard| {
-            LockableRecordWriteGuard {
-                record_ptr: &self.record_ptr,
-                _lock_guard: guard,
-            }
+        ExclusiveLockGuard::new(&self.lock).map(|guard| LockableRecordWriteGuard {
+            record_ptr: &self.record_ptr,
+            _lock_guard: guard,
         })
     }
 

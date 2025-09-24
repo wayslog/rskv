@@ -140,10 +140,11 @@ impl<T: Sized + Default> FixedPageArray<T> {
     }
 
     fn add_page(&self, page_idx: u64) -> *mut FixedPage<T> {
-        let layout = match Layout::from_size_align(std::mem::size_of::<FixedPage<T>>(), self.alignment) {
-            Ok(layout) => layout,
-            Err(_) => return ptr::null_mut(), // Invalid alignment
-        };
+        let layout =
+            match Layout::from_size_align(std::mem::size_of::<FixedPage<T>>(), self.alignment) {
+                Ok(layout) => layout,
+                Err(_) => return ptr::null_mut(), // Invalid alignment
+            };
         let new_page_ptr = unsafe { aligned_alloc(layout) as *mut FixedPage<T> };
         unsafe { ptr::write(new_page_ptr, FixedPage::default()) };
 
@@ -167,15 +168,16 @@ impl<T: Sized + Default> FixedPageArray<T> {
 
 impl<T: Sized + Default> Drop for FixedPageArray<T> {
     fn drop(&mut self) {
-        let layout = match Layout::from_size_align(std::mem::size_of::<FixedPage<T>>(), self.alignment) {
-            Ok(layout) => layout,
-            Err(_) => {
-                // If we can't create the layout, we can't safely free the memory
-                // This should never happen if the array was created successfully
-                log::error!("Cannot create layout during drop - potential memory leak");
-                return;
-            }
-        };
+        let layout =
+            match Layout::from_size_align(std::mem::size_of::<FixedPage<T>>(), self.alignment) {
+                Ok(layout) => layout,
+                Err(_) => {
+                    // If we can't create the layout, we can't safely free the memory
+                    // This should never happen if the array was created successfully
+                    log::error!("Cannot create layout during drop - potential memory leak");
+                    return;
+                }
+            };
         for page_ptr in self.pages.iter() {
             let ptr = page_ptr.load(Ordering::Relaxed);
             if !ptr.is_null() {
@@ -196,7 +198,7 @@ struct FreeAddress {
 }
 
 thread_local! {
-    static FREE_LIST: RefCell<VecDeque<FreeAddress>> = RefCell::new(VecDeque::new());
+    static FREE_LIST: RefCell<VecDeque<FreeAddress>> = const { RefCell::new(VecDeque::new()) };
 }
 
 /// Free list entry for deferred deallocation
@@ -214,6 +216,12 @@ pub struct MallocFixedPageSize<'epoch, T: Sized + Default> {
     epoch: Option<&'epoch LightEpoch>,
     free_list: Mutex<VecDeque<FreeListEntry>>,
     _marker: PhantomData<T>,
+}
+
+impl<'epoch, T: Sized + Default> Default for MallocFixedPageSize<'epoch, T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
@@ -305,13 +313,31 @@ impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
         Status::Ok
     }
 
-    pub fn get(&self, address: FixedPageAddress) -> &mut T {
+    /// Gets a mutable reference to the element at the given address.
+    ///
+    /// # Safety
+    /// This method is unsafe because it allows multiple mutable references
+    /// to the same data. The caller must ensure exclusive access.
+    #[allow(clippy::mut_from_ref)]
+    pub unsafe fn get_unchecked(&self, address: FixedPageAddress) -> &mut T {
+        unsafe {
+            let array = &*self.page_array.load(Ordering::Acquire);
+            let page = array.get(address.page());
+            assert!(!page.is_null());
+            let elements = &(*page).elements;
+            let cell = &elements[address.offset() as usize];
+            &mut *cell.get()
+        }
+    }
+
+    /// Gets a safe immutable reference to the element at the given address.
+    pub fn get(&self, address: FixedPageAddress) -> &T {
         let array = unsafe { &*self.page_array.load(Ordering::Acquire) };
         let page = array.get(address.page());
         assert!(!page.is_null());
         let elements = unsafe { &(*page).elements };
         let cell = &elements[address.offset() as usize];
-        unsafe { &mut *cell.get() }
+        unsafe { &*cell.get() }
     }
 
     /// Returns the actual memory address for a given FixedPageAddress
@@ -364,16 +390,15 @@ impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
         let current_epoch = 0; // Simplified: use 0 as current epoch
 
         // Find the first entry that's safe to reuse
-        while let Some(entry) = free_list.front() {
-            if entry.epoch <= current_epoch {
-                let addr = entry.address;
-                free_list.pop_front();
-                return Some(addr);
-            } else {
-                // Entry is not yet safe to reuse, stop searching
-                break;
-            }
+        if let Some(entry) = free_list.front()
+            && entry.epoch <= current_epoch
+        {
+            let addr = entry.address;
+            free_list.pop_front();
+            return Some(addr);
         }
+        // Entry is not yet safe to reuse, no point in checking others
+        // since they are ordered by epoch
         None
     }
 

@@ -107,10 +107,11 @@ where
                 }
             };
 
-            let buffer = self
-                .hot_store
-                .hlog
-                .get_mut_slice(new_address, record_size as usize);
+            let buffer = unsafe {
+                self.hot_store
+                    .hlog
+                    .get_mut_slice_unchecked(new_address, record_size as usize)
+            };
             let new_record_info =
                 RecordInfo::new(find_context.entry.address(), 0, false, false, true);
 

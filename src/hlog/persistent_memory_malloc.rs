@@ -197,6 +197,12 @@ pub struct PersistentMemoryMalloc<'epoch, D: Disk> {
     pub disk: Option<Mutex<D>>,
 }
 
+impl<'epoch, D: Disk> Default for PersistentMemoryMalloc<'epoch, D> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'epoch, D: Disk> PersistentMemoryMalloc<'epoch, D> {
     pub const K_PAGE_SIZE: u64 = (Address::K_MAX_OFFSET + 1) as u64;
 
@@ -281,7 +287,13 @@ impl<'epoch, D: Disk> PersistentMemoryMalloc<'epoch, D> {
         unsafe { std::slice::from_raw_parts(page_ptr.add(offset), size) }
     }
 
-    pub fn get_mut_slice(&self, address: Address, size: usize) -> &mut [u8] {
+    /// Gets a mutable slice from the persistent memory.
+    ///
+    /// # Safety
+    /// This method is unsafe because it allows multiple mutable references
+    /// to the same data. The caller must ensure exclusive access.
+    #[allow(clippy::mut_from_ref)]
+    pub unsafe fn get_mut_slice_unchecked(&self, address: Address, size: usize) -> &mut [u8] {
         let page_idx = address.page() as usize;
         if page_idx >= self.pages.len() {
             return &mut [];
@@ -307,7 +319,7 @@ impl<'epoch, D: Disk> PersistentMemoryMalloc<'epoch, D> {
         unsafe {
             // Ensure proper alignment before dereferencing
             let ptr = slice.as_ptr();
-            if ptr as usize % std::mem::align_of::<Record<K, V>>() != 0 {
+            if !(ptr as usize).is_multiple_of(std::mem::align_of::<Record<K, V>>()) {
                 return None;
             }
             let record_ptr = ptr as *const Record<K, V>;
@@ -317,7 +329,7 @@ impl<'epoch, D: Disk> PersistentMemoryMalloc<'epoch, D> {
 
     pub fn allocate(&self, size: u64) -> Result<Address, Address> {
         // Ensure size is aligned to 8-byte boundary for proper alignment
-        let aligned_size = ((size + 7) / 8) * 8;
+        let aligned_size = size.div_ceil(8) * 8;
         let num_slots = (aligned_size / 8) as u32;
         let page_offset = self.tail_page_offset.reserve(num_slots);
 
@@ -348,7 +360,7 @@ impl<'epoch, D: Disk> PersistentMemoryMalloc<'epoch, D> {
 
             // Verify alignment
             debug_assert!(
-                actual_address as usize % 8 == 0,
+                (actual_address as usize).is_multiple_of(8),
                 "Allocated address not 8-byte aligned: {:p}",
                 actual_address
             );
@@ -356,7 +368,7 @@ impl<'epoch, D: Disk> PersistentMemoryMalloc<'epoch, D> {
             // Ensure the logical address is also 8-byte aligned
             let logical_offset = page_offset.offset() as u32;
             debug_assert!(
-                logical_offset % 8 == 0,
+                logical_offset.is_multiple_of(8),
                 "Logical offset not 8-byte aligned: {}",
                 logical_offset
             );
@@ -382,7 +394,10 @@ impl<'epoch, D: Disk> PersistentMemoryMalloc<'epoch, D> {
                 Ok(layout) => layout,
                 Err(_) => {
                     // This should never happen with valid page_size and alignment
-                    log::error!("Invalid layout parameters: size={}, align=64", self.page_size);
+                    log::error!(
+                        "Invalid layout parameters: size={}, align=64",
+                        self.page_size
+                    );
                     return;
                 }
             };

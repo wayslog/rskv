@@ -62,12 +62,14 @@ impl RecordLock {
     /// Returns true if successful, false if any locks are held
     pub fn try_lock_exclusive(&self) -> bool {
         let expected = 0u64;
-        self.0.compare_exchange(
-            expected,
-            Self::EXCLUSIVE_BIT,
-            Ordering::Acquire,
-            Ordering::Relaxed,
-        ).is_ok()
+        self.0
+            .compare_exchange(
+                expected,
+                Self::EXCLUSIVE_BIT,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .is_ok()
     }
 
     /// Releases a shared lock
@@ -98,12 +100,9 @@ impl RecordLock {
     /// Returns true if successful, false if no exclusive lock was held
     pub fn unlock_exclusive(&self) -> bool {
         let expected = Self::EXCLUSIVE_BIT;
-        self.0.compare_exchange(
-            expected,
-            0u64,
-            Ordering::Release,
-            Ordering::Relaxed,
-        ).is_ok()
+        self.0
+            .compare_exchange(expected, 0u64, Ordering::Release, Ordering::Relaxed)
+            .is_ok()
     }
 
     /// Checks if any lock is held

@@ -86,12 +86,11 @@ impl File {
     }
 
     pub fn close(&mut self) -> Result<(), Status> {
-        if self.file.take().is_some() {
-            if self.delete_on_close {
-                if std::fs::remove_file(&self.path).is_err() {
-                    return Err(Status::IoError);
-                }
-            }
+        if self.file.take().is_some()
+            && self.delete_on_close
+            && std::fs::remove_file(&self.path).is_err()
+        {
+            return Err(Status::IoError);
         }
         Ok(())
     }

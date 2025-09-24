@@ -41,7 +41,7 @@ impl FasterHash {
         local_rand_hash = Self::K_MAGIC_NUM * local_rand_hash + ((local_rand >> 16) & 0xFFFF);
         local_rand_hash = Self::K_MAGIC_NUM * local_rand_hash + ((local_rand >> 32) & 0xFFFF);
         local_rand_hash = Self::K_MAGIC_NUM * local_rand_hash + (local_rand >> 48);
-        local_rand_hash = Self::K_MAGIC_NUM * local_rand_hash;
+        local_rand_hash *= Self::K_MAGIC_NUM;
         rotr64(local_rand_hash, 43)
     }
 }

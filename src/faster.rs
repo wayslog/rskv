@@ -1,6 +1,5 @@
 use crate::core::checkpoint::{CheckpointMetadata, IndexMetadata};
 use crate::core::light_epoch::LightEpoch;
-use std::sync::atomic::Ordering;
 use crate::core::record::{Record, RecordInfo};
 use crate::core::status::Status;
 use crate::device::file_system_disk::FileSystemDisk;
@@ -11,6 +10,7 @@ use crate::index::mem_index::{FindContext, MemHashIndex};
 use std::fs;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
+use std::sync::atomic::Ordering;
 
 // The user-provided context for an upsert operation.
 pub trait UpsertContext {
@@ -144,7 +144,10 @@ where
             };
 
             // 2. Get a mutable slice to the allocated memory
-            let buffer = self.hlog.get_mut_slice(new_address, record_size as usize);
+            let buffer = unsafe {
+                self.hlog
+                    .get_mut_slice_unchecked(new_address, record_size as usize)
+            };
             if buffer.is_empty() {
                 return Status::Pending;
             }
@@ -166,7 +169,9 @@ where
 
             // Invalidate the allocated record before retrying
             unsafe {
-                let buffer = self.hlog.get_mut_slice(new_address, record_size as usize);
+                let buffer = self
+                    .hlog
+                    .get_mut_slice_unchecked(new_address, record_size as usize);
                 let record_ptr = buffer.as_mut_ptr() as *mut Record<K, V>;
                 // Read header safely using unaligned access
                 let header_bytes = std::slice::from_raw_parts(record_ptr as *const u8, 8);
@@ -310,7 +315,7 @@ where
 
                         // Found a match. Try in-place update if in mutable region.
                         if current_address >= read_only_address {
-                            let mut_buffer = self.hlog.get_mut_slice(
+                            let mut_buffer = self.hlog.get_mut_slice_unchecked(
                                 current_address,
                                 Record::<K, V>::required_size_with_alignment() as usize,
                             );
@@ -354,7 +359,10 @@ where
                 }
             };
 
-            let buffer = self.hlog.get_mut_slice(new_address, record_size as usize);
+            let buffer = unsafe {
+                self.hlog
+                    .get_mut_slice_unchecked(new_address, record_size as usize)
+            };
             let new_record_info =
                 RecordInfo::new(find_context.entry.address(), 0, false, false, true);
 
@@ -453,7 +461,7 @@ where
                     if current_address >= read_only_address {
                         let mut_buffer = self
                             .hlog
-                            .get_mut_slice(current_address, record_size as usize);
+                            .get_mut_slice_unchecked(current_address, record_size as usize);
                         let mut_record_ptr = mut_buffer.as_mut_ptr() as *mut Record<K, V>;
                         // Write header safely using unaligned access
                         let header_bytes =
@@ -501,7 +509,10 @@ where
                 }
             };
 
-            let buffer = self.hlog.get_mut_slice(new_address, record_size as usize);
+            let buffer = unsafe {
+                self.hlog
+                    .get_mut_slice_unchecked(new_address, record_size as usize)
+            };
             // The new tombstone points to the same previous record as the old entry.
             let new_record_info =
                 RecordInfo::new(find_context.entry.address(), 0, false, true, true);

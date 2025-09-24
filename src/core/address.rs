@@ -64,7 +64,7 @@ impl Address {
     /// The pointer must be 8-byte aligned.
     pub fn from_ptr(ptr: *const u8) -> Self {
         debug_assert!(
-            ptr as usize % 8 == 0,
+            (ptr as usize).is_multiple_of(8),
             "Pointer must be 8-byte aligned, but got address {:p}",
             ptr
         );

@@ -4,15 +4,9 @@ use rskv::faster::{FasterKv, ReadContext, UpsertContext};
 use std::path::Path;
 use std::time::Instant;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 struct SimpleData {
     value: u64,
-}
-
-impl Default for SimpleData {
-    fn default() -> Self {
-        SimpleData { value: 0 }
-    }
 }
 
 struct SimpleUpsertContext {

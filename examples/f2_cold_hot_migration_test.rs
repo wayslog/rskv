@@ -2,8 +2,6 @@ use rskv::core::status::Status;
 use rskv::f2::F2Kv;
 use rskv::faster::{ReadContext, RmwContext, UpsertContext};
 use std::path::Path;
-use std::sync::Arc;
-use std::thread;
 use std::time::Instant;
 
 // 测试数据结构
@@ -208,10 +206,10 @@ fn test_cold_hot_migration(f2_kv: &F2Kv<u64, MigrationTestData>) {
                 value: None,
             };
             let read_status = f2_kv.read(&mut read_ctx);
-            if read_status == Status::Ok {
-                if let Some(data) = read_ctx.value {
-                    println!("     迁移后数据: {:?}", data);
-                }
+            if read_status == Status::Ok
+                && let Some(data) = read_ctx.value
+            {
+                println!("     迁移后数据: {:?}", data);
             }
         }
         _ => println!("     RMW操作失败: {:?}", status),

@@ -50,6 +50,7 @@ impl UserData {
         String::from_utf8_lossy(&self.name[..null_pos]).to_string()
     }
 
+    #[allow(dead_code)]
     fn email_str(&self) -> String {
         let null_pos = self.email.iter().position(|&b| b == 0).unwrap_or(64);
         String::from_utf8_lossy(&self.email[..null_pos]).to_string()

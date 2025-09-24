@@ -3,7 +3,6 @@ use rskv::f2::F2Kv;
 use rskv::faster::{ReadContext, RmwContext, UpsertContext};
 use std::path::Path;
 use std::sync::Arc;
-use std::thread;
 use std::time::Instant;
 
 // 复杂测试数据结构
@@ -41,6 +40,7 @@ impl ComplexTestData {
             .as_secs();
     }
 
+    #[allow(dead_code)]
     fn update(&mut self, new_value: u64) {
         self.value = new_value;
         self.version += 1;

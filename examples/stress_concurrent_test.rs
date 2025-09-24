@@ -6,21 +6,11 @@ use std::sync::{Arc, Barrier, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 struct StressData {
     id: u64,
     timestamp: u64,
     data: [u8; 32], // 32 bytes of data
-}
-
-impl Default for StressData {
-    fn default() -> Self {
-        StressData {
-            id: 0,
-            timestamp: 0,
-            data: [0; 32],
-        }
-    }
 }
 
 struct StressUpsertContext {
@@ -88,8 +78,8 @@ fn stress_worker(
 
         // Create test data with some pattern
         let mut data = [0u8; 32];
-        for j in 0..32 {
-            data[j] = ((key + j as u64) % 256) as u8;
+        for (j, item) in data.iter_mut().enumerate() {
+            *item = ((key + j as u64) % 256) as u8;
         }
 
         let upsert_ctx = StressUpsertContext {
@@ -194,7 +184,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut max_duration = Duration::new(0, 0);
         let mut min_duration = Duration::from_secs(3600);
 
-        for (thread_id, duration, success) in results.iter() {
+        for (_thread_id, duration, success) in results.iter() {
             total_success += success;
             if *duration > max_duration {
                 max_duration = *duration;
@@ -254,8 +244,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let key = (thread_id * 20000) as u64 + i as u64;
 
                 let mut data = [0u8; 32];
-                for j in 0..32 {
-                    data[j] = ((key + j as u64) % 256) as u8;
+                for (j, item) in data.iter_mut().enumerate() {
+                    *item = ((key + j as u64) % 256) as u8;
                 }
 
                 let upsert_ctx = StressUpsertContext {

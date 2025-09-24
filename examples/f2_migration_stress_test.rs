@@ -3,7 +3,6 @@ use rskv::f2::F2Kv;
 use rskv::faster::{ReadContext, RmwContext, UpsertContext};
 use std::path::Path;
 use std::sync::Arc;
-use std::thread;
 use std::time::Instant;
 
 // 迁移测试数据结构
@@ -235,13 +234,13 @@ fn test_migration_triggers(f2_kv: &F2Kv<u64, MigrationData>) {
                 value: None,
             };
             let status = f2_kv.read(&mut read_ctx);
-            if status == Status::Ok {
-                if let Some(data) = read_ctx.value {
-                    println!(
-                        "     迁移后数据: 值={}, 访问次数={}, 迁移次数={}",
-                        data.value, data.access_count, data.migration_count
-                    );
-                }
+            if status == Status::Ok
+                && let Some(data) = read_ctx.value
+            {
+                println!(
+                    "     迁移后数据: 值={}, 访问次数={}, 迁移次数={}",
+                    data.value, data.access_count, data.migration_count
+                );
             }
         }
         _ => println!("     冷数据RMW操作失败: {:?}", status),

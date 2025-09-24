@@ -6,15 +6,9 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, Instant};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 struct SimpleData {
     value: u64,
-}
-
-impl Default for SimpleData {
-    fn default() -> Self {
-        SimpleData { value: 0 }
-    }
 }
 
 struct SimpleUpsertContext {
@@ -196,6 +190,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             total_success, num_threads
         );
         println!("  ⏱️  Total time: {:?}", total_duration);
+        println!("  ⏱️  Total OPS: {:?}", total_ops);
         println!("  ⏱️  Max thread time: {:?}", max_duration);
         println!("  📊 Total rate: {:.2} ops/sec", ops_per_sec);
         println!(

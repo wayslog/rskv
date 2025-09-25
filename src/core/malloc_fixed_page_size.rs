@@ -218,6 +218,11 @@ pub struct MallocFixedPageSize<'epoch, T: Sized + Default> {
     _marker: PhantomData<T>,
 }
 
+impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
+    /// Maximum number of entries to keep in the free list to prevent unbounded growth
+    const MAX_FREE_LIST_SIZE: usize = 1024;
+}
+
 impl<'epoch, T: Sized + Default> Default for MallocFixedPageSize<'epoch, T> {
     fn default() -> Self {
         Self::new()
@@ -387,29 +392,32 @@ impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
     /// Try to allocate from the free list with epoch safety
     fn try_allocate_from_free_list(&self, _guard: &Guard) -> Option<FixedPageAddress> {
         let mut free_list = self.free_list.lock().ok()?;
-        let current_epoch = 0; // Simplified: use 0 as current epoch
+        let current_epoch = 0u64; // Simplified epoch handling
 
-        // Find the first entry that's safe to reuse
+        // Clean up old entries that are now safe to reuse
         if let Some(entry) = free_list.front()
-            && entry.epoch <= current_epoch
-        {
-            let addr = entry.address;
-            free_list.pop_front();
-            return Some(addr);
-        }
-        // Entry is not yet safe to reuse, no point in checking others
-        // since they are ordered by epoch
+            && entry.epoch <= current_epoch.saturating_sub(2) {
+                let addr = entry.address;
+                free_list.pop_front();
+                return Some(addr);
+            }
         None
     }
 
     pub fn free_at_epoch(&self, addr: FixedPageAddress, _guard: &Guard) {
         // Add to deferred free list with current epoch
         if let Ok(mut free_list) = self.free_list.lock() {
+            let current_epoch = 0u64; // Simplified epoch handling
             let entry = FreeListEntry {
                 address: addr,
-                epoch: 0, // Simplified: use 0 as current epoch
+                epoch: current_epoch,
             };
             free_list.push_back(entry);
+
+            // Limit the size of free list to prevent unbounded growth
+            while free_list.len() > Self::MAX_FREE_LIST_SIZE {
+                free_list.pop_front();
+            }
         }
     }
 

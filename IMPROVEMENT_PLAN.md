@@ -21,21 +21,21 @@
 ### 第一阶段：代码质量优化 (高优先级)
 
 **1. 清理代码警告**
-- [ ] 移除未使用的导入 (`src/f2/tests.rs:3`)
-- [ ] 清理死代码 (`src/core/malloc_fixed_page_size.rs:183` - FreeAddress结构体)
-- [ ] 完善未实现的方法 (`src/hlog/persistent_memory_malloc.rs:137` - new_page方法)
-- [ ] 清理未使用的字段 (`src/index/cold_index.rs:16` - index_in_chunk)
-- [ ] 清理未使用的常量 (`src/index/hash_bucket.rs:19` - TENTATIVE_BIT)
+- [x] 移除未使用的导入 (`src/f2/tests.rs:3`)
+- [x] 清理死代码 (`src/core/malloc_fixed_page_size.rs:183` - FreeAddress结构体)
+- [x] 完善未实现的方法 (`src/hlog/persistent_memory_malloc.rs:137` - new_page方法)
+- [x] 清理未使用的字段 (`src/index/cold_index.rs:16` - index_in_chunk)
+- [x] 清理未使用的常量 (`src/index/hash_bucket.rs:19` - TENTATIVE_BIT)
 
 **2. 内存管理完善**
-- [ ] 完成`FreeAddress`结构体实现
-- [ ] 实现`new_page`方法的完整逻辑
-- [ ] 优化固定页面大小分配器
-- [ ] 添加内存泄漏检测机制
+- [x] 完成`FreeAddress`结构体实现
+- [x] 实现`new_page`方法的完整逻辑
+- [x] 优化固定页面大小分配器
+- [x] 添加内存泄漏检测机制
 
 **3. 错误处理改进**
-- [ ] 审查并替换所有`unwrap()`调用为适当的错误处理
-- [ ] 扩展`Status`枚举，提供更详细的错误信息
+- [x] 审查并替换所有`unwrap()`调用为适当的错误处理
+- [x] 扩展`Status`枚举，提供更详细的错误信息
 - [ ] 实现错误链和上下文传播
 - [ ] 添加错误恢复机制
 

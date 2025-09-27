@@ -174,3 +174,165 @@ impl std::fmt::Display for Status {
 
 /// Result type for operations that can fail with a Status
 pub type Result<T> = std::result::Result<T, Status>;
+
+/// Error with context and chaining support
+#[derive(Debug, Clone)]
+pub struct ErrorContext {
+    pub status: Status,
+    pub context: String,
+    pub source: Option<Box<ErrorContext>>,
+    pub location: Option<String>,
+}
+
+impl ErrorContext {
+    /// Create a new error context
+    pub fn new(status: Status) -> Self {
+        Self {
+            status,
+            context: String::new(),
+            source: None,
+            location: None,
+        }
+    }
+
+    /// Add context to the error
+    pub fn with_context<S: Into<String>>(mut self, context: S) -> Self {
+        self.context = context.into();
+        self
+    }
+
+    /// Add source error
+    pub fn with_source(mut self, source: ErrorContext) -> Self {
+        self.source = Some(Box::new(source));
+        self
+    }
+
+    /// Add location information
+    pub fn with_location<S: Into<String>>(mut self, location: S) -> Self {
+        self.location = location.into().into();
+        self
+    }
+
+    /// Get the root cause status
+    pub fn root_cause(&self) -> Status {
+        match &self.source {
+            Some(source) => source.root_cause(),
+            None => self.status,
+        }
+    }
+
+    /// Get error chain as a string
+    pub fn error_chain(&self) -> String {
+        let mut chain = Vec::new();
+        let mut current = Some(self);
+
+        while let Some(error) = current {
+            let mut msg = format!("{}: {}", error.status.as_str(), error.status.description());
+            if !error.context.is_empty() {
+                msg.push_str(&format!(" ({})", error.context));
+            }
+            if let Some(ref location) = error.location {
+                msg.push_str(&format!(" at {}", location));
+            }
+            chain.push(msg);
+            current = error.source.as_ref().map(|s| s.as_ref());
+        }
+
+        chain.join(" -> ")
+    }
+
+    /// Check if error chain contains a specific status
+    pub fn contains_status(&self, status: Status) -> bool {
+        if self.status == status {
+            return true;
+        }
+        match &self.source {
+            Some(source) => source.contains_status(status),
+            None => false,
+        }
+    }
+}
+
+impl std::fmt::Display for ErrorContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.error_chain())
+    }
+}
+
+impl std::error::Error for ErrorContext {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.source.as_ref().map(|s| s.as_ref() as &dyn std::error::Error)
+    }
+}
+
+impl From<Status> for ErrorContext {
+    fn from(status: Status) -> Self {
+        Self::new(status)
+    }
+}
+
+/// Enhanced result type with error context
+pub type ContextResult<T> = std::result::Result<T, ErrorContext>;
+
+/// Macro for creating error context with location
+#[macro_export]
+macro_rules! error_context {
+    ($status:expr) => {
+        $crate::core::status::ErrorContext::new($status)
+            .with_location(format!("{}:{}", file!(), line!()))
+    };
+    ($status:expr, $context:expr) => {
+        $crate::core::status::ErrorContext::new($status)
+            .with_context($context)
+            .with_location(format!("{}:{}", file!(), line!()))
+    };
+}
+
+/// Macro for adding context to existing result
+#[macro_export]
+macro_rules! with_context {
+    ($result:expr, $context:expr) => {
+        $result.map_err(|e| match e {
+            err if err.is_error() => $crate::core::status::ErrorContext::new(err)
+                .with_context($context)
+                .with_location(format!("{}:{}", file!(), line!())),
+            _ => $crate::core::status::ErrorContext::new(err)
+                .with_location(format!("{}:{}", file!(), line!())),
+        })
+    };
+}
+
+/// Trait for converting results to context results
+pub trait ResultExt<T> {
+    fn with_context<S: Into<String>>(self, context: S) -> ContextResult<T>;
+    fn with_location(self) -> ContextResult<T>;
+}
+
+impl<T> ResultExt<T> for Result<T> {
+    fn with_context<S: Into<String>>(self, context: S) -> ContextResult<T> {
+        self.map_err(|status| {
+            ErrorContext::new(status)
+                .with_context(context)
+        })
+    }
+
+    fn with_location(self) -> ContextResult<T> {
+        self.map_err(|status| {
+            ErrorContext::new(status)
+        })
+    }
+}
+
+impl<T> ResultExt<T> for ContextResult<T> {
+    fn with_context<S: Into<String>>(self, context: S) -> ContextResult<T> {
+        self.map_err(|error| {
+            ErrorContext::new(error.status)
+                .with_context(context)
+                .with_source(error)
+        })
+    }
+
+    fn with_location(self) -> ContextResult<T> {
+        self
+    }
+}

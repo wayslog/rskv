@@ -1,6 +1,8 @@
 pub mod cold_index;
 pub mod cold_index_contexts;
 pub mod definitions;
+pub mod dynamic_hash_table;
+pub mod enhanced_overflow_management;
 pub mod hash_bucket;
 pub mod hash_table;
 pub mod key_hash;

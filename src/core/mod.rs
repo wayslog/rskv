@@ -1,13 +1,16 @@
 pub mod address;
+pub mod advanced_locking;
 pub mod alloc;
 pub mod async_context;
 pub mod checkpoint;
 pub mod constants;
+pub mod enhanced_checkpoint;
 pub mod light_epoch;
 pub mod lockable_record;
 pub mod locking;
 pub mod malloc_fixed_page_size;
 pub mod phase;
 pub mod record;
+pub mod recovery;
 pub mod status;
 pub mod utility;

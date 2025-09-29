@@ -1,6 +1,6 @@
 use rskv::core::status::Status;
-use rskv::f2::F2Kv;
-use rskv::faster::{ReadContext, RmwContext, UpsertContext};
+use rskv::r2::R2Kv;
+use rskv::rskv_core::{ReadContext, RmwContext, UpsertContext};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
@@ -135,7 +135,7 @@ impl RmwContext for ComplexRmwContext {
 }
 
 // 测试F2的基本功能
-fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
+fn test_r2_basic_operations(r2_kv: &R2Kv<u64, ComplexTestData>) {
     println!("🔧 测试F2基本操作");
 
     // 测试写入
@@ -145,7 +145,7 @@ fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
         value: test_data,
     };
 
-    let status = f2_kv.upsert(&upsert_ctx);
+    let status = r2_kv.upsert(&upsert_ctx);
     assert_eq!(status, Status::Ok);
     println!("   写入操作成功");
 
@@ -155,7 +155,7 @@ fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
         value: None,
     };
 
-    let status = f2_kv.read(&mut read_ctx);
+    let status = r2_kv.read(&mut read_ctx);
     // 由于F2的实现，读取可能返回NotFound，这是正常的
     if status == Status::Ok {
         assert!(read_ctx.value.is_some());
@@ -171,7 +171,7 @@ fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
         metadata_update: 2000,
     };
 
-    let status = f2_kv.rmw(&mut rmw_ctx);
+    let status = r2_kv.rmw(&mut rmw_ctx);
     assert_eq!(status, Status::Ok);
     println!("   RMW操作成功");
 
@@ -181,7 +181,7 @@ fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
         value: None,
     };
 
-    let status = f2_kv.read(&mut read_ctx);
+    let status = r2_kv.read(&mut read_ctx);
     if status == Status::Ok {
         if let Some(data) = read_ctx.value {
             // RMW后的值应该是increment值（因为RMW创建新数据）
@@ -198,7 +198,7 @@ fn test_f2_basic_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
 }
 
 // 测试冷热数据迁移场景
-fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
+fn test_cold_hot_migration_scenarios(r2_kv: &R2Kv<u64, ComplexTestData>) {
     println!("\n 测试冷热数据迁移场景");
 
     // 场景1: 大量数据写入，模拟热数据
@@ -209,7 +209,7 @@ fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
             key: i,
             value: data,
         };
-        f2_kv.upsert(&upsert_ctx);
+        r2_kv.upsert(&upsert_ctx);
     }
     println!("     写入100个热数据项");
 
@@ -221,14 +221,14 @@ fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
                 key: i,
                 value: None,
             };
-            f2_kv.read(&mut read_ctx);
+            r2_kv.read(&mut read_ctx);
 
             let mut rmw_ctx = ComplexRmwContext {
                 key: i,
                 increment: 1,
                 metadata_update: i * 1000,
             };
-            f2_kv.rmw(&mut rmw_ctx);
+            r2_kv.rmw(&mut rmw_ctx);
         }
     }
     println!("     完成热点数据访问");
@@ -240,7 +240,7 @@ fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
             key: i,
             value: None,
         };
-        f2_kv.read(&mut read_ctx);
+        r2_kv.read(&mut read_ctx);
     }
     println!("     完成冷数据访问");
 
@@ -252,7 +252,7 @@ fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
         metadata_update: 50000,
     };
 
-    let status = f2_kv.rmw(&mut rmw_ctx);
+    let status = r2_kv.rmw(&mut rmw_ctx);
     assert_eq!(status, Status::Ok);
     println!("     冷数据RMW操作成功，可能触发迁移");
 
@@ -262,7 +262,7 @@ fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
         value: None,
     };
 
-    let status = f2_kv.read(&mut read_ctx);
+    let status = r2_kv.read(&mut read_ctx);
     assert_eq!(status, Status::Ok);
     if let Some(data) = read_ctx.value {
         println!(
@@ -273,7 +273,7 @@ fn test_cold_hot_migration_scenarios(f2_kv: &F2Kv<u64, ComplexTestData>) {
 }
 
 // 测试并发访问（简化版本）
-fn test_concurrent_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
+fn test_concurrent_operations(r2_kv: &R2Kv<u64, ComplexTestData>) {
     println!("\n 测试并发操作");
 
     let num_operations = 400; // 8 * 50
@@ -285,13 +285,13 @@ fn test_concurrent_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
         // 写入操作
         let data = ComplexTestData::new(key, key * 100);
         let upsert_ctx = ComplexUpsertContext { key, value: data };
-        if f2_kv.upsert(&upsert_ctx) == Status::Ok {
+        if r2_kv.upsert(&upsert_ctx) == Status::Ok {
             total_success += 1;
         }
 
         // 读取操作
         let mut read_ctx = ComplexReadContext { key, value: None };
-        if f2_kv.read(&mut read_ctx) == Status::Ok {
+        if r2_kv.read(&mut read_ctx) == Status::Ok {
             total_success += 1;
         }
 
@@ -301,7 +301,7 @@ fn test_concurrent_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
             increment: 1,
             metadata_update: key * 1000,
         };
-        if f2_kv.rmw(&mut rmw_ctx) == Status::Ok {
+        if r2_kv.rmw(&mut rmw_ctx) == Status::Ok {
             total_success += 1;
         }
     }
@@ -310,7 +310,7 @@ fn test_concurrent_operations(f2_kv: &F2Kv<u64, ComplexTestData>) {
 }
 
 // 性能基准测试
-fn performance_benchmark(f2_kv: &F2Kv<u64, ComplexTestData>) {
+fn performance_benchmark(r2_kv: &R2Kv<u64, ComplexTestData>) {
     println!("\n 性能基准测试");
 
     let num_operations = 10000;
@@ -323,7 +323,7 @@ fn performance_benchmark(f2_kv: &F2Kv<u64, ComplexTestData>) {
             key: i,
             value: data,
         };
-        f2_kv.upsert(&upsert_ctx);
+        r2_kv.upsert(&upsert_ctx);
     }
     let write_duration = write_start.elapsed();
 
@@ -334,7 +334,7 @@ fn performance_benchmark(f2_kv: &F2Kv<u64, ComplexTestData>) {
             key: i,
             value: None,
         };
-        f2_kv.read(&mut read_ctx);
+        r2_kv.read(&mut read_ctx);
     }
     let read_duration = read_start.elapsed();
 
@@ -346,7 +346,7 @@ fn performance_benchmark(f2_kv: &F2Kv<u64, ComplexTestData>) {
             increment: 1,
             metadata_update: i * 1000,
         };
-        f2_kv.rmw(&mut rmw_ctx);
+        r2_kv.rmw(&mut rmw_ctx);
     }
     let rmw_duration = rmw_start.elapsed();
 
@@ -365,7 +365,7 @@ fn performance_benchmark(f2_kv: &F2Kv<u64, ComplexTestData>) {
 }
 
 // 压力测试
-fn stress_test(f2_kv: &F2Kv<u64, ComplexTestData>) {
+fn stress_test(r2_kv: &R2Kv<u64, ComplexTestData>) {
     println!("\n 压力测试");
 
     let num_operations = 16000; // 16 * 1000
@@ -381,14 +381,14 @@ fn stress_test(f2_kv: &F2Kv<u64, ComplexTestData>) {
                 // 写入
                 let data = ComplexTestData::new(key, key * 100);
                 let upsert_ctx = ComplexUpsertContext { key, value: data };
-                if f2_kv.upsert(&upsert_ctx) == Status::Ok {
+                if r2_kv.upsert(&upsert_ctx) == Status::Ok {
                     total_success += 1;
                 }
             }
             1 => {
                 // 读取
                 let mut read_ctx = ComplexReadContext { key, value: None };
-                if f2_kv.read(&mut read_ctx) == Status::Ok {
+                if r2_kv.read(&mut read_ctx) == Status::Ok {
                     total_success += 1;
                 }
             }
@@ -399,7 +399,7 @@ fn stress_test(f2_kv: &F2Kv<u64, ComplexTestData>) {
                     increment: 1,
                     metadata_update: key * 1000,
                 };
-                if f2_kv.rmw(&mut rmw_ctx) == Status::Ok {
+                if r2_kv.rmw(&mut rmw_ctx) == Status::Ok {
                     total_success += 1;
                 }
             }
@@ -428,8 +428,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("================================");
 
     // 创建临时目录
-    let hot_dir = "/tmp/f2_comprehensive_hot";
-    let cold_dir = "/tmp/f2_comprehensive_cold";
+    let hot_dir = "/tmp/r2_comprehensive_hot";
+    let cold_dir = "/tmp/r2_comprehensive_cold";
 
     for dir in [hot_dir, cold_dir] {
         if Path::new(dir).exists() {
@@ -440,24 +440,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 初始化F2存储系统
     println!(" 初始化F2存储系统...");
-    let f2_kv = F2Kv::<u64, ComplexTestData>::new(hot_dir, cold_dir)?;
-    let f2_kv_arc = Arc::new(f2_kv);
+    let r2_kv = R2Kv::<u64, ComplexTestData>::new(hot_dir, cold_dir)?;
+    let r2_kv_arc = Arc::new(r2_kv);
     println!(" F2存储系统初始化成功");
 
     // 基本操作测试
-    test_f2_basic_operations(&f2_kv_arc);
+    test_r2_basic_operations(&r2_kv_arc);
 
     // 冷热数据迁移场景测试
-    test_cold_hot_migration_scenarios(&f2_kv_arc);
+    test_cold_hot_migration_scenarios(&r2_kv_arc);
 
     // 并发操作测试
-    test_concurrent_operations(&f2_kv_arc);
+    test_concurrent_operations(&r2_kv_arc);
 
     // 性能基准测试
-    performance_benchmark(&f2_kv_arc);
+    performance_benchmark(&r2_kv_arc);
 
     // 压力测试
-    stress_test(&f2_kv_arc);
+    stress_test(&r2_kv_arc);
 
     // 清理
     for dir in [hot_dir, cold_dir] {

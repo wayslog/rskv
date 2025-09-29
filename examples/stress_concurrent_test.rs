@@ -1,6 +1,6 @@
 use rskv::core::status::Status;
 use rskv::device::file_system_disk::FileSystemDisk;
-use rskv::faster::{FasterKv, ReadContext, UpsertContext};
+use rskv::rskv_core::{RsKv, ReadContext, UpsertContext};
 use std::path::Path;
 use std::sync::{Arc, Barrier, Mutex};
 use std::thread;
@@ -62,7 +62,7 @@ impl ReadContext for StressReadContext {
 }
 
 fn stress_worker(
-    kv: Arc<FasterKv<u64, StressData, FileSystemDisk>>,
+    kv: Arc<RsKv<u64, StressData, FileSystemDisk>>,
     barrier: Arc<Barrier>,
     thread_id: usize,
     num_operations: usize,
@@ -117,7 +117,7 @@ fn stress_worker(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 FASTER Rust KV Store Stress Concurrent Test");
+    println!("🚀 RsKv Stress Concurrent Test");
     println!("==============================================");
 
     let temp_dir = "/tmp/rskv_stress_concurrent_test";
@@ -128,7 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("📦 Initializing KV store...");
     let disk = FileSystemDisk::new(temp_dir)?;
-    let kv = Arc::new(FasterKv::<u64, StressData, FileSystemDisk>::new(
+    let kv = Arc::new(RsKv::<u64, StressData, FileSystemDisk>::new(
         1 << 25,
         1 << 19,
         disk,

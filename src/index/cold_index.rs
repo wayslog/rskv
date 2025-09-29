@@ -1,7 +1,7 @@
 use crate::core::address::Address;
 use crate::core::status::Status;
 use crate::device::file_system_disk::FileSystemDisk;
-use crate::faster::{FasterKv, ReadContext, RmwContext};
+use crate::rskv_core::{RsKv, ReadContext, RmwContext};
 use crate::index::IHashIndex;
 use crate::index::cold_index_contexts::{
     ColdIndexRmwContext, HashIndexChunkKey, HashIndexChunkValue,
@@ -36,7 +36,7 @@ impl<'a> ReadContext for ColdIndexRead<'a> {
 }
 
 pub struct ColdIndex<'epoch> {
-    internal_kv: FasterKv<'epoch, HashIndexChunkKey, HashIndexChunkValue, FileSystemDisk>,
+    internal_kv: RsKv<'epoch, HashIndexChunkKey, HashIndexChunkValue, FileSystemDisk>,
 }
 
 impl RmwContext for ColdIndexRmwContext {
@@ -113,7 +113,7 @@ impl<'epoch> IHashIndex<'epoch> for ColdIndex<'epoch> {
 impl<'epoch> ColdIndex<'epoch> {
     pub fn new(log_path: &str) -> Result<Self, Status> {
         let disk = FileSystemDisk::new(&format!("{}/cold_index", log_path))?;
-        let internal_kv = FasterKv::new(1 << 30, 1 << 20, disk)?;
+        let internal_kv = RsKv::new(1 << 30, 1 << 20, disk)?;
         Ok(Self { internal_kv })
     }
 

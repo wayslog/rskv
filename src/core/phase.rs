@@ -1,4 +1,4 @@
-/// Phases, used internally by FASTER to keep track of how far along FASTER has gotten during
+/// Phases, used internally by RsKv to keep track of how far along RsKv has gotten during
 /// checkpoint, gc, and grow actions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]

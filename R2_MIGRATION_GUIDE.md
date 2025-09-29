@@ -1,8 +1,8 @@
-# F2 冷热数据迁移机制指南
+# R2 冷热数据迁移机制指南
 
 ## 概述
 
-F2是一个基于FASTER的冷热数据分离存储系统，它通过智能的数据迁移机制来优化存储性能和成本。本文档详细介绍了F2的冷热数据迁移机制、测试方法和使用示例。
+R2是一个基于RsKv的冷热数据分离存储系统，它通过智能的数据迁移机制来优化存储性能和成本。本文档详细介绍了R2的冷热数据迁移机制、测试方法和使用示例。
 
 ## 架构设计
 
@@ -10,11 +10,11 @@ F2是一个基于FASTER的冷热数据分离存储系统，它通过智能的数
 
 1. **热存储 (Hot Store)**: 存储频繁访问的数据，提供低延迟访问
 2. **冷存储 (Cold Store)**: 存储不常访问的数据，提供大容量存储
-3. **F2Kv**: 统一的键值存储接口，自动管理冷热数据迁移
+3. **R2Kv**: 统一的键值存储接口，自动管理冷热数据迁移
 
 ### 数据迁移策略
 
-F2采用以下策略进行冷热数据迁移：
+R2采用以下策略进行冷热数据迁移：
 
 1. **写入策略**: 所有新数据首先写入热存储
 2. **读取策略**: 优先从热存储读取，未找到时从冷存储读取
@@ -26,14 +26,14 @@ F2采用以下策略进行冷热数据迁移：
 
 ```rust
 // 所有写入操作都进入热存储
-let status = f2_kv.upsert(&upsert_context);
+let status = r2_kv.upsert(&upsert_context);
 ```
 
 ### 2. 数据读取流程
 
 ```rust
 // 优先从热存储读取
-let status = f2_kv.read(&mut read_context);
+let status = r2_kv.read(&mut read_context);
 if status == Status::NotFound {
     // 如果热存储中未找到，从冷存储读取
     // 这个过程对用户是透明的
@@ -48,10 +48,10 @@ let mut rmw_ctx = TestRmwContext {
     key: cold_data_key,
     increment: value,
 };
-let status = f2_kv.rmw(&mut rmw_ctx);
+let status = r2_kv.rmw(&mut rmw_ctx);
 ```
 
-当对冷存储中的数据进行RMW操作时，F2会：
+当对冷存储中的数据进行RMW操作时，R2会：
 1. 从冷存储读取原始数据
 2. 在热存储中创建新的记录
 3. 更新索引指向热存储中的新记录
@@ -61,9 +61,9 @@ let status = f2_kv.rmw(&mut rmw_ctx);
 
 ### 1. 基础功能测试
 
-**文件**: `examples/f2_basic_example.rs`
+**文件**: `examples/r2_basic_example.rs`
 
-测试F2的基本CRUD操作：
+测试R2的基本CRUD操作：
 - 数据写入
 - 数据读取
 - RMW操作
@@ -71,7 +71,7 @@ let status = f2_kv.rmw(&mut rmw_ctx);
 
 ### 2. 冷热数据迁移测试
 
-**文件**: `examples/f2_cold_hot_migration_test.rs`
+**文件**: `examples/r2_cold_hot_migration_test.rs`
 
 专门测试冷热数据迁移机制：
 - 模拟热点数据访问模式
@@ -81,7 +81,7 @@ let status = f2_kv.rmw(&mut rmw_ctx);
 
 ### 3. 综合测试
 
-**文件**: `examples/f2_comprehensive_test.rs`
+**文件**: `examples/r2_comprehensive_test.rs`
 
 全面的功能测试：
 - 基本操作测试
@@ -92,7 +92,7 @@ let status = f2_kv.rmw(&mut rmw_ctx);
 
 ### 4. 迁移压力测试
 
-**文件**: `examples/f2_migration_stress_test.rs`
+**文件**: `examples/r2_migration_stress_test.rs`
 
 专门的压力测试：
 - 大量数据创建和访问
@@ -104,7 +104,7 @@ let status = f2_kv.rmw(&mut rmw_ctx);
 
 ### 5. 单元测试
 
-**文件**: `src/f2_tests.rs`
+**文件**: `src/r2_tests.rs`
 
 核心功能的单元测试：
 - 基本操作测试
@@ -116,29 +116,29 @@ let status = f2_kv.rmw(&mut rmw_ctx);
 
 ## 运行测试
 
-### 运行所有F2测试
+### 运行所有R2测试
 
 ```bash
-./run_f2_tests.sh
+make test-r2-full
 ```
 
 ### 运行特定测试
 
 ```bash
 # 运行基础示例
-cargo run --example f2_basic_example
+cargo run --example r2_basic_example
 
 # 运行冷热数据迁移测试
-cargo run --example f2_cold_hot_migration_test
+cargo run --example r2_cold_hot_migration_test
 
 # 运行综合测试
-cargo run --example f2_comprehensive_test
+cargo run --example r2_comprehensive_test
 
 # 运行迁移压力测试
-cargo run --example f2_migration_stress_test
+cargo run --example r2_migration_stress_test
 
 # 运行单元测试
-cargo test f2_tests
+cargo test r2_tests
 ```
 
 ## 性能指标
@@ -169,23 +169,23 @@ cargo test f2_tests
 ### 基本使用
 
 ```rust
-use rskv::f2::F2Kv;
-use rskv::faster::{ReadContext, UpsertContext, RmwContext};
+use rskv::r2::R2Kv;
+use rskv::rskv_core::{ReadContext, UpsertContext, RmwContext};
 
-// 创建F2存储实例
-let f2_kv = F2Kv::<u64, MyData>::new("/tmp/hot", "/tmp/cold")?;
+// 创建R2存储实例
+let r2_kv = R2Kv::<u64, MyData>::new("/tmp/hot", "/tmp/cold")?;
 
 // 写入数据
 let upsert_ctx = MyUpsertContext { key: 1, value: data };
-f2_kv.upsert(&upsert_ctx)?;
+r2_kv.upsert(&upsert_ctx)?;
 
 // 读取数据
 let mut read_ctx = MyReadContext { key: 1, value: None };
-f2_kv.read(&mut read_ctx)?;
+r2_kv.read(&mut read_ctx)?;
 
 // RMW操作（可能触发迁移）
 let mut rmw_ctx = MyRmwContext { key: 1, increment: 100 };
-f2_kv.rmw(&mut rmw_ctx)?;
+r2_kv.rmw(&mut rmw_ctx)?;
 ```
 
 ### 高级使用
@@ -195,14 +195,14 @@ f2_kv.rmw(&mut rmw_ctx)?;
 for i in 1..=1000 {
     let data = create_data(i);
     let upsert_ctx = MyUpsertContext { key: i, value: data };
-    f2_kv.upsert(&upsert_ctx)?;
+    r2_kv.upsert(&upsert_ctx)?;
 }
 
 // 并发操作
-let f2_kv = Arc::new(f2_kv);
+let r2_kv = Arc::new(r2_kv);
 let handles: Vec<_> = (0..num_threads)
     .map(|thread_id| {
-        let f2_kv = Arc::clone(&f2_kv);
+        let r2_kv = Arc::clone(&r2_kv);
         thread::spawn(move || {
             // 执行并发操作
         })
@@ -220,7 +220,7 @@ let handles: Vec<_> = (0..num_threads)
 
 ### 2. 并发访问优化
 
-- 使用Arc<F2Kv>进行多线程共享
+- 使用Arc<R2Kv>进行多线程共享
 - 避免过度的锁竞争
 - 合理设置线程数量
 
@@ -243,7 +243,7 @@ let handles: Vec<_> = (0..num_threads)
 1. **编译错误**: 确保所有依赖项正确安装
 2. **运行时错误**: 检查文件路径权限
 3. **性能问题**: 调整热存储和冷存储大小
-4. **并发问题**: 确保正确使用Arc<F2Kv>
+4. **并发问题**: 确保正确使用Arc<R2Kv>
 
 ### 调试技巧
 

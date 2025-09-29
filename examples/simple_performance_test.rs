@@ -1,6 +1,6 @@
 use rskv::core::status::Status;
 use rskv::device::file_system_disk::FileSystemDisk;
-use rskv::faster::{FasterKv, ReadContext, UpsertContext};
+use rskv::rskv_core::{RsKv, ReadContext, UpsertContext};
 use std::path::Path;
 use std::time::Instant;
 
@@ -58,7 +58,7 @@ impl ReadContext for SimpleReadContext {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 FASTER Rust KV Store Simple Performance Test");
+    println!("🚀 RsKv Simple Performance Test");
     println!("===============================================");
 
     let temp_dir = "/tmp/rskv_simple_performance_test";
@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("📦 Initializing KV store...");
     let disk = FileSystemDisk::new(temp_dir)?;
-    let kv = FasterKv::<u64, SimpleData, FileSystemDisk>::new(1 << 22, 1 << 17, disk)?; // 4MB log, 128K table
+    let kv = RsKv::<u64, SimpleData, FileSystemDisk>::new(1 << 22, 1 << 17, disk)?; // 4MB log, 128K table
     println!("✅ KV store initialized successfully");
 
     // Test 1: Small batch upsert

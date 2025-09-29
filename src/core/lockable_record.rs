@@ -1,4 +1,4 @@
-/// Lockable record wrapper that provides fine-grained locking for FASTER-style operations
+/// Lockable record wrapper that provides fine-grained locking for RsKv-style operations
 use crate::core::locking::{ExclusiveLockGuard, RecordLock, SharedLockGuard};
 use crate::core::record::{Record, RecordInfo};
 use std::ptr;

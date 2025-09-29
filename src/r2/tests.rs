@@ -2,8 +2,8 @@
 #[allow(clippy::module_inception)]
 mod tests {
     use crate::core::status::Status;
-    use crate::f2::F2Kv;
-    use crate::faster::{ReadContext, RmwContext, UpsertContext};
+    use crate::r2::R2Kv;
+    use crate::rskv_core::{ReadContext, RmwContext, UpsertContext};
     use std::path::Path;
     use std::sync::Arc;
     use std::thread;
@@ -117,8 +117,8 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let hot_dir = format!("/tmp/f2_test_hot_{}", test_id);
-        let cold_dir = format!("/tmp/f2_test_cold_{}", test_id);
+        let hot_dir = format!("/tmp/r2_test_hot_{}", test_id);
+        let cold_dir = format!("/tmp/r2_test_cold_{}", test_id);
 
         for dir in [&hot_dir, &cold_dir] {
             if Path::new(dir).exists() {
@@ -139,12 +139,12 @@ mod tests {
     }
 
     #[test]
-    fn test_f2_basic_operations() {
+    fn test_r2_basic_operations() {
         let (hot_dir, cold_dir) = create_test_dirs();
 
         // 初始化F2存储系统
-        let f2_kv = F2Kv::<u64, TestData>::new(&hot_dir, &cold_dir)
-            .expect("Failed to create F2Kv instance");
+        let r2_kv = R2Kv::<u64, TestData>::new(&hot_dir, &cold_dir)
+            .expect("Failed to create R2Kv instance");
 
         // 测试写入
         let test_data = TestData::new(1, 100);
@@ -153,7 +153,7 @@ mod tests {
             value: test_data,
         };
 
-        let status = f2_kv.upsert(&upsert_ctx);
+        let status = r2_kv.upsert(&upsert_ctx);
         assert_eq!(status, Status::Ok);
 
         // 测试读取
@@ -162,7 +162,7 @@ mod tests {
             value: None,
         };
 
-        let status = f2_kv.read(&mut read_ctx);
+        let status = r2_kv.read(&mut read_ctx);
         // 由于F2的实现，读取可能返回NotFound，这是正常的
         if status == Status::Ok {
             assert!(read_ctx.value.is_some());
@@ -175,7 +175,7 @@ mod tests {
             increment: 50,
         };
 
-        let status = f2_kv.rmw(&mut rmw_ctx);
+        let status = r2_kv.rmw(&mut rmw_ctx);
         assert_eq!(status, Status::Ok);
 
         // 验证RMW结果
@@ -184,7 +184,7 @@ mod tests {
             value: None,
         };
 
-        let status = f2_kv.read(&mut read_ctx);
+        let status = r2_kv.read(&mut read_ctx);
         if status == Status::Ok {
             assert_eq!(read_ctx.value.unwrap().value, 50); // RMW创建的新值
         }
@@ -193,12 +193,12 @@ mod tests {
     }
 
     #[test]
-    fn test_f2_cold_hot_migration() {
+    fn test_r2_cold_hot_migration() {
         let (hot_dir, cold_dir) = create_test_dirs();
 
         // 初始化F2存储系统
-        let f2_kv = F2Kv::<u64, TestData>::new(&hot_dir, &cold_dir)
-            .expect("Failed to create F2Kv instance");
+        let r2_kv = R2Kv::<u64, TestData>::new(&hot_dir, &cold_dir)
+            .expect("Failed to create R2Kv instance");
 
         // 写入一些数据到热存储
         for i in 1..=10 {
@@ -207,7 +207,7 @@ mod tests {
                 key: i,
                 value: test_data,
             };
-            f2_kv.upsert(&upsert_ctx);
+            r2_kv.upsert(&upsert_ctx);
         }
 
         // 模拟冷数据访问（通过RMW操作）
@@ -217,7 +217,7 @@ mod tests {
             increment: 1000,
         };
 
-        let status = f2_kv.rmw(&mut rmw_ctx);
+        let status = r2_kv.rmw(&mut rmw_ctx);
         // 注意：由于我们的实现中冷存储是空的，这个操作会创建新数据
         assert_eq!(status, Status::Ok);
 
@@ -227,7 +227,7 @@ mod tests {
             value: None,
         };
 
-        let status = f2_kv.read(&mut read_ctx);
+        let status = r2_kv.read(&mut read_ctx);
         assert_eq!(status, Status::Ok);
         assert!(read_ctx.value.is_some());
 
@@ -235,18 +235,18 @@ mod tests {
     }
 
     #[test]
-    fn test_f2_concurrent_operations() {
+    fn test_r2_concurrent_operations() {
         let (hot_dir, cold_dir) = create_test_dirs();
 
         // 初始化F2存储系统
-        let f2_kv = Arc::new(F2Kv::<u64, TestData>::new(&hot_dir, &cold_dir).unwrap());
+        let r2_kv = Arc::new(R2Kv::<u64, TestData>::new(&hot_dir, &cold_dir).unwrap());
 
         let num_threads = 4;
         let operations_per_thread = 25;
 
         let handles: Vec<_> = (0..num_threads)
             .map(|thread_id| {
-                let f2_kv = Arc::clone(&f2_kv);
+                let r2_kv = Arc::clone(&r2_kv);
                 thread::spawn(move || {
                     let mut success_count = 0;
                     let start_key = thread_id * operations_per_thread + 1;
@@ -260,19 +260,19 @@ mod tests {
                             key,
                             value: test_data,
                         };
-                        if f2_kv.upsert(&upsert_ctx) == Status::Ok {
+                        if r2_kv.upsert(&upsert_ctx) == Status::Ok {
                             success_count += 1;
                         }
 
                         // 读取操作
                         let mut read_ctx = TestReadContext { key, value: None };
-                        if f2_kv.read(&mut read_ctx) == Status::Ok {
+                        if r2_kv.read(&mut read_ctx) == Status::Ok {
                             success_count += 1;
                         }
 
                         // RMW操作
                         let mut rmw_ctx = TestRmwContext { key, increment: 1 };
-                        if f2_kv.rmw(&mut rmw_ctx) == Status::Ok {
+                        if r2_kv.rmw(&mut rmw_ctx) == Status::Ok {
                             success_count += 1;
                         }
                     }
@@ -302,12 +302,12 @@ mod tests {
     }
 
     #[test]
-    fn test_f2_batch_operations() {
+    fn test_r2_batch_operations() {
         let (hot_dir, cold_dir) = create_test_dirs();
 
         // 初始化F2存储系统
-        let f2_kv = F2Kv::<u64, TestData>::new(&hot_dir, &cold_dir)
-            .expect("Failed to create F2Kv instance");
+        let r2_kv = R2Kv::<u64, TestData>::new(&hot_dir, &cold_dir)
+            .expect("Failed to create R2Kv instance");
 
         // 批量写入
         let num_items = 50; // 减少数量以避免I/O错误
@@ -317,7 +317,7 @@ mod tests {
                 key: i,
                 value: test_data,
             };
-            let status = f2_kv.upsert(&upsert_ctx);
+            let status = r2_kv.upsert(&upsert_ctx);
             if status != Status::Ok {
                 println!("     写入键 {} 失败: {:?}", i, status);
             }
@@ -330,7 +330,7 @@ mod tests {
                 key: i,
                 value: None,
             };
-            let status = f2_kv.read(&mut read_ctx);
+            let status = r2_kv.read(&mut read_ctx);
             if status == Status::Ok {
                 read_success_count += 1;
                 assert_eq!(read_ctx.value.unwrap().value, i * 1000);
@@ -352,7 +352,7 @@ mod tests {
                 key: i,
                 increment: 100,
             };
-            let status = f2_kv.rmw(&mut rmw_ctx);
+            let status = r2_kv.rmw(&mut rmw_ctx);
             assert_eq!(status, Status::Ok);
         }
 
@@ -363,7 +363,7 @@ mod tests {
                 key: i,
                 value: None,
             };
-            let status = f2_kv.read(&mut read_ctx);
+            let status = r2_kv.read(&mut read_ctx);
             if status == Status::Ok {
                 rmw_success_count += 1;
                 // RMW后的值应该是合理的值
@@ -390,12 +390,12 @@ mod tests {
     }
 
     #[test]
-    fn test_f2_error_handling() {
+    fn test_r2_error_handling() {
         let (hot_dir, cold_dir) = create_test_dirs();
 
         // 初始化F2存储系统
-        let f2_kv = F2Kv::<u64, TestData>::new(&hot_dir, &cold_dir)
-            .expect("Failed to create F2Kv instance");
+        let r2_kv = R2Kv::<u64, TestData>::new(&hot_dir, &cold_dir)
+            .expect("Failed to create R2Kv instance");
 
         // 测试读取不存在的键
         let mut read_ctx = TestReadContext {
@@ -403,7 +403,7 @@ mod tests {
             value: None,
         };
 
-        let status = f2_kv.read(&mut read_ctx);
+        let status = r2_kv.read(&mut read_ctx);
         assert_eq!(status, Status::NotFound);
         assert!(read_ctx.value.is_none());
 
@@ -413,7 +413,7 @@ mod tests {
             increment: 1000,
         };
 
-        let status = f2_kv.rmw(&mut rmw_ctx);
+        let status = r2_kv.rmw(&mut rmw_ctx);
         assert_eq!(status, Status::Ok);
 
         // 验证RMW创建的数据
@@ -422,7 +422,7 @@ mod tests {
             value: None,
         };
 
-        let status = f2_kv.read(&mut read_ctx);
+        let status = r2_kv.read(&mut read_ctx);
         if status == Status::Ok {
             assert_eq!(read_ctx.value.unwrap().value, 1000);
         } else {
@@ -434,12 +434,12 @@ mod tests {
     }
 
     #[test]
-    fn test_f2_data_consistency() {
+    fn test_r2_data_consistency() {
         let (hot_dir, cold_dir) = create_test_dirs();
 
         // 初始化F2存储系统
-        let f2_kv = F2Kv::<u64, TestData>::new(&hot_dir, &cold_dir)
-            .expect("Failed to create F2Kv instance");
+        let r2_kv = R2Kv::<u64, TestData>::new(&hot_dir, &cold_dir)
+            .expect("Failed to create R2Kv instance");
 
         // 写入初始数据
         let test_data = TestData::new(1, 100);
@@ -447,7 +447,7 @@ mod tests {
             key: 1,
             value: test_data,
         };
-        f2_kv.upsert(&upsert_ctx);
+        r2_kv.upsert(&upsert_ctx);
 
         // 多次RMW操作
         for i in 1..=10 {
@@ -455,7 +455,7 @@ mod tests {
                 key: 1,
                 increment: i,
             };
-            let status = f2_kv.rmw(&mut rmw_ctx);
+            let status = r2_kv.rmw(&mut rmw_ctx);
             assert_eq!(status, Status::Ok);
         }
 
@@ -465,7 +465,7 @@ mod tests {
             value: None,
         };
 
-        let status = f2_kv.read(&mut read_ctx);
+        let status = r2_kv.read(&mut read_ctx);
         if status == Status::Ok {
             let final_data = read_ctx.value.unwrap();
             // 由于RMW的实现，最终值应该是最后一次increment的值

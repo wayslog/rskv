@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use rskv::faster::{FasterKv, UpsertContext, ReadContext, RmwContext, DeleteContext};
+use rskv::rskv_core::{RsKv, UpsertContext, ReadContext, RmwContext, DeleteContext};
 use rskv::device::file_system_disk::FileSystemDisk;
 use rskv::core::status::Status;
 use std::path::Path;
@@ -176,7 +176,7 @@ fuzz_target!(|data: &[u8]| {
         Err(_) => return,
     };
     
-    let kv = match FasterKv::<u64, FuzzData, FileSystemDisk>::new(
+    let kv = match RsKv::<u64, FuzzData, FileSystemDisk>::new(
         1 << 20, // 1MB log
         1 << 16, // 64KB table
         disk

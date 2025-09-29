@@ -1,6 +1,6 @@
 use rskv::core::status::Status;
-use rskv::f2::F2Kv;
-use rskv::faster::{ReadContext, RmwContext, UpsertContext};
+use rskv::r2::R2Kv;
+use rskv::rskv_core::{ReadContext, RmwContext, UpsertContext};
 use std::path::Path;
 
 // 简单的测试数据结构
@@ -109,8 +109,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("================================");
 
     // 创建临时目录
-    let hot_dir = "/tmp/f2_hot_test";
-    let cold_dir = "/tmp/f2_cold_test";
+    let hot_dir = "/tmp/r2_hot_test";
+    let cold_dir = "/tmp/r2_cold_test";
 
     for dir in [hot_dir, cold_dir] {
         if Path::new(dir).exists() {
@@ -121,7 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 初始化F2存储系统
     println!("初始化F2存储系统...");
-    let f2_kv = F2Kv::<u64, TestData>::new(hot_dir, cold_dir)?;
+    let r2_kv = R2Kv::<u64, TestData>::new(hot_dir, cold_dir)?;
     println!("F2存储系统初始化成功");
     println!("   - 热存储路径: {}", hot_dir);
     println!("   - 冷存储路径: {}", cold_dir);
@@ -142,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         value: test_data,
     };
 
-    let status = f2_kv.upsert(&upsert_ctx);
+    let status = r2_kv.upsert(&upsert_ctx);
     match status {
         Status::Ok => println!("   热存储写入成功: key=1, value={}", test_data.value),
         _ => println!("   热存储写入失败: {:?}", status),
@@ -155,7 +155,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         value: None,
     };
 
-    let status = f2_kv.read(&mut read_ctx);
+    let status = r2_kv.read(&mut read_ctx);
     match status {
         Status::Ok => {
             if let Some(data) = read_ctx.value {
@@ -175,7 +175,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         increment: 50,
     };
 
-    let status = f2_kv.rmw(&mut rmw_ctx);
+    let status = r2_kv.rmw(&mut rmw_ctx);
     match status {
         Status::Ok => println!("   RMW操作成功，值增加50"),
         _ => println!("   RMW操作失败: {:?}", status),
@@ -188,7 +188,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         value: None,
     };
 
-    let status = f2_kv.read(&mut read_ctx);
+    let status = r2_kv.read(&mut read_ctx);
     match status {
         Status::Ok => {
             if let Some(data) = read_ctx.value {
@@ -225,7 +225,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             value: test_data,
         };
 
-        let status = f2_kv.upsert(&upsert_ctx);
+        let status = r2_kv.upsert(&upsert_ctx);
         if status == Status::Ok {
             success_count += 1;
         }
@@ -240,14 +240,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             key: i,
             value: None,
         };
-        let read_status = f2_kv.read(&mut read_ctx);
+        let read_status = r2_kv.read(&mut read_ctx);
 
         // RMW
         let mut rmw_ctx = TestRmwContext {
             key: i,
             increment: 1,
         };
-        let rmw_status = f2_kv.rmw(&mut rmw_ctx);
+        let rmw_status = r2_kv.rmw(&mut rmw_ctx);
 
         println!("  Key {}: 读取={:?}, RMW={:?}", i, read_status, rmw_status);
     }

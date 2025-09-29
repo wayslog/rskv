@@ -1,6 +1,6 @@
 use rskv::core::status::Status;
-use rskv::f2::F2Kv;
-use rskv::faster::{ReadContext, UpsertContext};
+use rskv::r2::R2Kv;
+use rskv::rskv_core::{ReadContext, UpsertContext};
 use std::hash::{Hash, Hasher};
 
 // Simple context implementations
@@ -80,12 +80,12 @@ impl ReadContext for SimpleReadContext {
 }
 
 fn main() {
-    println!("F2Kv Performance Optimization Example");
+    println!("R2Kv Performance Optimization Example");
     println!("=====================================\n");
 
-    // Create F2Kv instance with performance tracking
-    let f2 = F2Kv::<u64, u64>::new("f2_perf_hot", "f2_perf_cold")
-        .expect("Failed to create F2Kv");
+    // Create R2Kv instance with performance tracking
+    let r2 = R2Kv::<u64, u64>::new("r2_perf_hot", "r2_perf_cold")
+        .expect("Failed to create R2Kv");
 
     println!("Phase 1: Writing data with hotspot pattern");
     println!("-------------------------------------------");
@@ -104,7 +104,7 @@ fn main() {
         };
 
         let ctx = SimpleUpsertContext::new(key, key * 100);
-        let status = f2.upsert(&ctx);
+        let status = r2.upsert(&ctx);
         if status != Status::Ok {
             eprintln!("Upsert failed for key {}: {:?}", key, status);
         }
@@ -116,7 +116,7 @@ fn main() {
     println!("Phase 2: Analyzing access patterns");
     println!("-----------------------------------");
 
-    let access_stats = f2.get_access_stats();
+    let access_stats = r2.get_access_stats();
     println!("Access Statistics:");
     println!("  Total accesses: {}", access_stats.total_accesses);
     println!("  Unique keys: {}", access_stats.unique_keys);
@@ -129,7 +129,7 @@ fn main() {
     println!();
 
     // Get migration statistics
-    let migration_stats = f2.get_migration_stats();
+    let migration_stats = r2.get_migration_stats();
     println!("Migration Statistics:");
     println!("  Current hot storage: {} bytes", migration_stats.current_hot_size);
     println!("  Max hot storage: {} bytes", migration_stats.max_hot_size);
@@ -140,7 +140,7 @@ fn main() {
     println!();
 
     // Get recommendations
-    let recommendation = f2.get_access_recommendation();
+    let recommendation = r2.get_access_recommendation();
     println!("Performance Recommendation:");
     println!("  Detected pattern: {:?}", recommendation.pattern);
     println!("  Suggestion: {}", recommendation.suggestion);
@@ -151,7 +151,7 @@ fn main() {
     // Get hot keys
     println!("Top 10 Hot Keys:");
     println!("----------------");
-    let hot_keys = f2.get_hot_keys(10);
+    let hot_keys = r2.get_hot_keys(10);
     for (rank, (key_hash, access_count)) in hot_keys.iter().enumerate() {
         println!("  #{}: Key hash {} - {} accesses", rank + 1, key_hash, access_count);
     }
@@ -166,7 +166,7 @@ fn main() {
 
     for key in 0..100 {
         let mut ctx = SimpleReadContext::new(key);
-        let status = f2.read(&mut ctx);
+        let status = r2.read(&mut ctx);
         if status == Status::Ok {
             hits += 1;
         } else {
@@ -183,7 +183,7 @@ fn main() {
     // Final statistics
     println!("Final Statistics");
     println!("----------------");
-    let final_stats = f2.get_access_stats();
+    let final_stats = r2.get_access_stats();
     println!("  Total operations: {}", final_stats.total_accesses);
     println!("  Read/Write ratio: {:.2}",
         final_stats.read_count as f64 / final_stats.write_count.max(1) as f64);
@@ -191,7 +191,7 @@ fn main() {
 
     println!("Performance analysis complete!");
     println!("\nNote: This example demonstrates the integrated performance");
-    println!("monitoring and optimization features of F2Kv, including:");
+    println!("monitoring and optimization features of R2Kv, including:");
     println!("  - Access pattern analysis");
     println!("  - Migration management");
     println!("  - Hot key detection");

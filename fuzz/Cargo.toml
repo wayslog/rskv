@@ -21,8 +21,8 @@ doc = false
 bench = false
 
 [[bin]]
-name = "faster_kv_fuzz"
-path = "fuzz_targets/faster_kv_fuzz.rs"
+name = "rskv_fuzz"
+path = "fuzz_targets/rskv_fuzz.rs"
 test = false
 doc = false
 bench = false

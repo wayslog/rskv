@@ -1,6 +1,6 @@
 use rskv::core::status::Status;
-use rskv::f2::F2Kv;
-use rskv::faster::{ReadContext, RmwContext, UpsertContext};
+use rskv::r2::R2Kv;
+use rskv::rskv_core::{ReadContext, RmwContext, UpsertContext};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
@@ -132,7 +132,7 @@ impl RmwContext for MigrationRmwContext {
 }
 
 // 模拟冷热数据分离
-fn simulate_cold_hot_separation(f2_kv: &F2Kv<u64, MigrationData>) {
+fn simulate_cold_hot_separation(r2_kv: &R2Kv<u64, MigrationData>) {
     println!(" 模拟冷热数据分离过程");
 
     // 阶段1: 创建大量初始数据
@@ -144,7 +144,7 @@ fn simulate_cold_hot_separation(f2_kv: &F2Kv<u64, MigrationData>) {
             key: i,
             value: data,
         };
-        f2_kv.upsert(&upsert_ctx);
+        r2_kv.upsert(&upsert_ctx);
     }
     println!("     创建了 {} 个初始数据项", num_initial_data);
 
@@ -161,14 +161,14 @@ fn simulate_cold_hot_separation(f2_kv: &F2Kv<u64, MigrationData>) {
                 key: i,
                 value: None,
             };
-            f2_kv.read(&mut read_ctx);
+            r2_kv.read(&mut read_ctx);
 
             // RMW操作
             let mut rmw_ctx = MigrationRmwContext {
                 key: i,
                 increment: 1,
             };
-            f2_kv.rmw(&mut rmw_ctx);
+            r2_kv.rmw(&mut rmw_ctx);
         }
     }
     println!("     完成热点数据访问模拟 ({} 个热点数据)", hot_data_count);
@@ -185,14 +185,14 @@ fn simulate_cold_hot_separation(f2_kv: &F2Kv<u64, MigrationData>) {
                 key: i,
                 value: None,
             };
-            f2_kv.read(&mut read_ctx);
+            r2_kv.read(&mut read_ctx);
         }
     }
     println!("     完成冷数据访问模拟 ({} 个冷数据)", cold_data_count);
 }
 
 // 测试冷热数据迁移触发
-fn test_migration_triggers(f2_kv: &F2Kv<u64, MigrationData>) {
+fn test_migration_triggers(r2_kv: &R2Kv<u64, MigrationData>) {
     println!("\n 测试冷热数据迁移触发机制");
 
     // 测试1: 冷数据被访问时触发迁移
@@ -204,7 +204,7 @@ fn test_migration_triggers(f2_kv: &F2Kv<u64, MigrationData>) {
         key: cold_key,
         value: None,
     };
-    let status = f2_kv.read(&mut read_ctx);
+    let status = r2_kv.read(&mut read_ctx);
     match status {
         Status::Ok => {
             if let Some(data) = read_ctx.value {
@@ -223,7 +223,7 @@ fn test_migration_triggers(f2_kv: &F2Kv<u64, MigrationData>) {
         key: cold_key,
         increment: 1000,
     };
-    let status = f2_kv.rmw(&mut rmw_ctx);
+    let status = r2_kv.rmw(&mut rmw_ctx);
     match status {
         Status::Ok => {
             println!("     冷数据RMW操作成功，可能触发迁移");
@@ -233,7 +233,7 @@ fn test_migration_triggers(f2_kv: &F2Kv<u64, MigrationData>) {
                 key: cold_key,
                 value: None,
             };
-            let status = f2_kv.read(&mut read_ctx);
+            let status = r2_kv.read(&mut read_ctx);
             if status == Status::Ok
                 && let Some(data) = read_ctx.value
             {
@@ -256,7 +256,7 @@ fn test_migration_triggers(f2_kv: &F2Kv<u64, MigrationData>) {
             key,
             increment: 100,
         };
-        if f2_kv.rmw(&mut rmw_ctx) == Status::Ok {
+        if r2_kv.rmw(&mut rmw_ctx) == Status::Ok {
             migration_count += 1;
         }
     }
@@ -268,7 +268,7 @@ fn test_migration_triggers(f2_kv: &F2Kv<u64, MigrationData>) {
 }
 
 // 并发迁移测试
-fn test_concurrent_migration(f2_kv: &F2Kv<u64, MigrationData>) {
+fn test_concurrent_migration(r2_kv: &R2Kv<u64, MigrationData>) {
     println!("\n 测试并发冷热数据迁移");
 
     let num_operations = 800; // 8 * 100
@@ -284,21 +284,21 @@ fn test_concurrent_migration(f2_kv: &F2Kv<u64, MigrationData>) {
                 // 写入新数据
                 let data = MigrationData::new(key, key * 100);
                 let upsert_ctx = MigrationUpsertContext { key, value: data };
-                if f2_kv.upsert(&upsert_ctx) == Status::Ok {
+                if r2_kv.upsert(&upsert_ctx) == Status::Ok {
                     total_success += 1;
                 }
             }
             1 => {
                 // 读取数据
                 let mut read_ctx = MigrationReadContext { key, value: None };
-                if f2_kv.read(&mut read_ctx) == Status::Ok {
+                if r2_kv.read(&mut read_ctx) == Status::Ok {
                     total_success += 1;
                 }
             }
             2 => {
                 // RMW操作（可能触发迁移）
                 let mut rmw_ctx = MigrationRmwContext { key, increment: 1 };
-                if f2_kv.rmw(&mut rmw_ctx) == Status::Ok {
+                if r2_kv.rmw(&mut rmw_ctx) == Status::Ok {
                     total_success += 1;
                     total_migrations += 1;
                 }
@@ -311,7 +311,7 @@ fn test_concurrent_migration(f2_kv: &F2Kv<u64, MigrationData>) {
                         key: batch_key,
                         increment: 10,
                     };
-                    if f2_kv.rmw(&mut rmw_ctx) == Status::Ok {
+                    if r2_kv.rmw(&mut rmw_ctx) == Status::Ok {
                         total_success += 1;
                         total_migrations += 1;
                     }
@@ -330,7 +330,7 @@ fn test_concurrent_migration(f2_kv: &F2Kv<u64, MigrationData>) {
 }
 
 // 迁移性能测试
-fn test_migration_performance(f2_kv: &F2Kv<u64, MigrationData>) {
+fn test_migration_performance(r2_kv: &R2Kv<u64, MigrationData>) {
     println!("\n 迁移性能测试");
 
     let num_operations = 5000;
@@ -343,7 +343,7 @@ fn test_migration_performance(f2_kv: &F2Kv<u64, MigrationData>) {
             key: i,
             value: data,
         };
-        f2_kv.upsert(&upsert_ctx);
+        r2_kv.upsert(&upsert_ctx);
     }
 
     let create_duration = start_time.elapsed();
@@ -358,7 +358,7 @@ fn test_migration_performance(f2_kv: &F2Kv<u64, MigrationData>) {
             key: i,
             increment: 1,
         };
-        if f2_kv.rmw(&mut rmw_ctx) == Status::Ok {
+        if r2_kv.rmw(&mut rmw_ctx) == Status::Ok {
             migration_count += 1;
         }
     }
@@ -376,7 +376,7 @@ fn test_migration_performance(f2_kv: &F2Kv<u64, MigrationData>) {
 }
 
 // 迁移一致性测试
-fn test_migration_consistency(f2_kv: &F2Kv<u64, MigrationData>) {
+fn test_migration_consistency(r2_kv: &R2Kv<u64, MigrationData>) {
     println!("\n 迁移一致性测试");
 
     // 创建测试数据
@@ -386,7 +386,7 @@ fn test_migration_consistency(f2_kv: &F2Kv<u64, MigrationData>) {
         key: test_key,
         value: initial_data,
     };
-    f2_kv.upsert(&upsert_ctx);
+    r2_kv.upsert(&upsert_ctx);
 
     // 执行多次RMW操作
     let mut expected_value = 1000;
@@ -395,7 +395,7 @@ fn test_migration_consistency(f2_kv: &F2Kv<u64, MigrationData>) {
             key: test_key,
             increment: i,
         };
-        let status = f2_kv.rmw(&mut rmw_ctx);
+        let status = r2_kv.rmw(&mut rmw_ctx);
         assert_eq!(status, Status::Ok);
         expected_value += i;
 
@@ -405,7 +405,7 @@ fn test_migration_consistency(f2_kv: &F2Kv<u64, MigrationData>) {
                 key: test_key,
                 value: None,
             };
-            let status = f2_kv.read(&mut read_ctx);
+            let status = r2_kv.read(&mut read_ctx);
             assert_eq!(status, Status::Ok);
 
             if let Some(data) = read_ctx.value {
@@ -423,7 +423,7 @@ fn test_migration_consistency(f2_kv: &F2Kv<u64, MigrationData>) {
         key: test_key,
         value: None,
     };
-    let status = f2_kv.read(&mut read_ctx);
+    let status = r2_kv.read(&mut read_ctx);
     assert_eq!(status, Status::Ok);
 
     if let Some(data) = read_ctx.value {
@@ -440,8 +440,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=====================================");
 
     // 创建临时目录
-    let hot_dir = "/tmp/f2_migration_stress_hot";
-    let cold_dir = "/tmp/f2_migration_stress_cold";
+    let hot_dir = "/tmp/r2_migration_stress_hot";
+    let cold_dir = "/tmp/r2_migration_stress_cold";
 
     for dir in [hot_dir, cold_dir] {
         if Path::new(dir).exists() {
@@ -452,24 +452,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 初始化F2存储系统
     println!(" 初始化F2存储系统...");
-    let f2_kv = F2Kv::<u64, MigrationData>::new(hot_dir, cold_dir)?;
-    let f2_kv_arc = Arc::new(f2_kv);
+    let r2_kv = R2Kv::<u64, MigrationData>::new(hot_dir, cold_dir)?;
+    let r2_kv_arc = Arc::new(r2_kv);
     println!(" F2存储系统初始化成功");
 
     // 模拟冷热数据分离
-    simulate_cold_hot_separation(&f2_kv_arc);
+    simulate_cold_hot_separation(&r2_kv_arc);
 
     // 测试迁移触发机制
-    test_migration_triggers(&f2_kv_arc);
+    test_migration_triggers(&r2_kv_arc);
 
     // 并发迁移测试
-    test_concurrent_migration(&f2_kv_arc);
+    test_concurrent_migration(&r2_kv_arc);
 
     // 迁移性能测试
-    test_migration_performance(&f2_kv_arc);
+    test_migration_performance(&r2_kv_arc);
 
     // 迁移一致性测试
-    test_migration_consistency(&f2_kv_arc);
+    test_migration_consistency(&r2_kv_arc);
 
     // 清理
     for dir in [hot_dir, cold_dir] {

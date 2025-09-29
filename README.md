@@ -1,6 +1,6 @@
-# FASTER Rust KV Store
+# RsKv - Rust Key-Value Store
 
-这是一个基于Microsoft FASTER的Rust实现的高性能键值存储系统。FASTER是一个为点查找和重更新设计的高性能并发键值存储和缓存，支持大于内存的数据和一致恢复。
+这是一个基于Microsoft FASTER的Rust实现的高性能键值存储系统。RsKv是一个为点查找和重更新设计的高性能并发键值存储和缓存，支持大于内存的数据和一致恢复。
 
 ## 功能特性
 
@@ -36,8 +36,8 @@ src/
 │   ├── hash_table.rs       # 哈希表
 │   ├── mem_index.rs        # 内存索引
 │   └── mod.rs              # 索引模块
-├── faster.rs               # 主要KV存储实现
-└── f2.rs                   # 二级KV存储
+├── rskv_core.rs            # 核心KV存储实现 (RsKv)
+└── r2.rs                   # 两层存储实现 (R2Kv)
 ```
 
 ## 示例
@@ -45,7 +45,7 @@ src/
 ### 基本使用
 
 ```rust
-use rskv::faster::{FasterKv, UpsertContext, ReadContext};
+use rskv::rskv_core::{RsKv, UpsertContext, ReadContext};
 use rskv::device::file_system_disk::FileSystemDisk;
 use rskv::core::status::Status;
 
@@ -103,7 +103,7 @@ impl ReadContext for UserReadContext {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 创建KV存储
     let disk = FileSystemDisk::new("/tmp/rskv_test")?;
-    let mut kv = FasterKv::<u64, UserData, FileSystemDisk>::new(1 << 20, 1 << 16, disk)?;
+    let kv = RsKv::<u64, UserData, FileSystemDisk>::new(1 << 20, 1 << 16, disk)?;
 
     // 插入数据
     let upsert_ctx = UserUpsertContext {
@@ -161,7 +161,9 @@ cargo run --example simple_performance_test
 
 ## 开发状态
 
-这是一个实验性的Rust实现，基于Microsoft FASTER的C++版本。当前版本已经实现了基本的KV存储功能，但在某些高级功能（如完整的并发支持和数据恢复）方面还需要进一步完善。
+RsKv 是一个高性能的Rust键值存储实现，灵感来自Microsoft FASTER。当前版本已经实现了完整的KV存储功能，包括：
+- RsKv: 核心单层高性能存储
+- R2Kv: 冷热数据分离的两层存储，带智能迁移和性能监控
 
 ## 许可证
 

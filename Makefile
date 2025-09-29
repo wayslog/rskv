@@ -1,13 +1,15 @@
 # Makefile for rskv project
 # Provides convenient commands for development and CI
 
-.PHONY: help check test build clean format clippy audit coverage fuzz benchmark install-tools
+.PHONY: help check test build clean format clippy audit coverage fuzz benchmark install-tools test-r2 test-r2-full
 
 # Default target
 help:
 	@echo "Available commands:"
 	@echo "  make check        - Run all checks (format, clippy, audit, build, test)"
 	@echo "  make test         - Run tests"
+	@echo "  make test-r2      - Run R2Kv test suite"
+	@echo "  make test-r2-full - Run complete R2Kv test suite with examples"
 	@echo "  make build        - Build the project"
 	@echo "  make clean        - Clean build artifacts"
 	@echo "  make format       - Format code"
@@ -59,6 +61,44 @@ test:
 	@echo "Running tests..."
 	cargo test --all-features
 
+# Run R2Kv test suite (unit tests only)
+test-r2:
+	@echo "Running R2Kv Test Suite"
+	@echo "======================="
+	@echo ""
+	@echo "Running R2Kv unit tests..."
+	cargo test --lib r2::tests --all-features
+	@echo ""
+	@echo "Running performance optimization tests..."
+	cargo test --lib performance:: --all-features
+	@echo ""
+	@echo "R2Kv Test Suite Complete!"
+
+# Run complete R2Kv test suite with examples
+test-r2-full:
+	@echo "Running Complete R2Kv Test Suite"
+	@echo "================================="
+	@echo ""
+	@echo "1. Running basic operations test..."
+	cargo run --example r2_basic_example
+	@echo ""
+	@echo "2. Running cold/hot migration test..."
+	cargo run --example r2_cold_hot_migration_test
+	@echo ""
+	@echo "3. Running comprehensive test..."
+	cargo run --example r2_comprehensive_test
+	@echo ""
+	@echo "4. Running migration stress test..."
+	cargo run --example r2_migration_stress_test
+	@echo ""
+	@echo "5. Running performance example..."
+	cargo run --example r2_performance_example
+	@echo ""
+	@echo "6. Running all unit tests..."
+	cargo test --all-features
+	@echo ""
+	@echo "Complete R2Kv Test Suite Finished!"
+
 # Run examples
 examples:
 	@echo "Running examples..."
@@ -73,7 +113,7 @@ coverage:
 # Run fuzz tests
 fuzz:
 	@echo "Running fuzz tests..."
-	cd fuzz && cargo fuzz run faster_kv_fuzz -- -max_total_time=300
+	cd fuzz && cargo fuzz run rskv_fuzz -- -max_total_time=300
 	cd fuzz && cargo fuzz run concurrent_fuzz -- -max_total_time=300
 
 # Run benchmarks
@@ -109,15 +149,24 @@ full-check: format-check clippy audit build test coverage fuzz benchmark
 # Run specific example
 run-example:
 	@echo "Available examples:"
+	@echo ""
+	@echo "R2Kv Examples (Two-tier storage with performance monitoring):"
+	@echo "  make run-example EXAMPLE=r2_basic_example"
+	@echo "  make run-example EXAMPLE=r2_cold_hot_migration_test"
+	@echo "  make run-example EXAMPLE=r2_comprehensive_test"
+	@echo "  make run-example EXAMPLE=r2_migration_stress_test"
+	@echo "  make run-example EXAMPLE=r2_performance_example"
+	@echo ""
+	@echo "RsKv Examples (Core storage):"
 	@echo "  make run-example EXAMPLE=basic_test"
 	@echo "  make run-example EXAMPLE=comprehensive_test"
 	@echo "  make run-example EXAMPLE=concurrent_test"
-	@echo "  make run-example EXAMPLE=fuzz_test"
 	@echo "  make run-example EXAMPLE=simple_performance_test"
 	@echo "  make run-example EXAMPLE=stress_concurrent_test"
 ifdef EXAMPLE
 	cargo run --example $(EXAMPLE)
 else
+	@echo ""
 	@echo "Please specify EXAMPLE=example_name"
 endif
 

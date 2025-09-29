@@ -1,6 +1,6 @@
 use rskv::core::status::Status;
 use rskv::device::file_system_disk::FileSystemDisk;
-use rskv::faster::{DeleteContext, FasterKv, ReadContext, RmwContext, UpsertContext};
+use rskv::rskv_core::{DeleteContext, RsKv, ReadContext, RmwContext, UpsertContext};
 use std::path::Path;
 
 // Test data structures
@@ -163,7 +163,7 @@ impl DeleteContext for UserDeleteContext {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 FASTER Rust KV Store Comprehensive Test");
+    println!("🚀 RsKv Comprehensive Test");
     println!("==========================================");
 
     // Create a temporary directory for testing
@@ -176,7 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize the KV store with larger capacity
     println!("📦 Initializing KV store...");
     let disk = FileSystemDisk::new(temp_dir)?;
-    let mut kv = FasterKv::<u64, UserData, FileSystemDisk>::new(1 << 24, 1 << 18, disk)?; // 16MB log, 256K table
+    let mut kv = RsKv::<u64, UserData, FileSystemDisk>::new(1 << 24, 1 << 18, disk)?; // 16MB log, 256K table
     println!("✅ KV store initialized successfully");
 
     // Test 1: Basic Upsert Operations

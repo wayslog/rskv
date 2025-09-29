@@ -61,7 +61,7 @@ pub trait DeleteContext {
     fn key_hash(&self) -> u64;
 }
 
-pub struct FasterKv<'epoch, K, V, D: Disk> {
+pub struct RsKv<'epoch, K, V, D: Disk> {
     epoch: LightEpoch,
     pub hlog: PersistentMemoryMalloc<'epoch, D>,
     pub index: MemHashIndex<'epoch, HotLogHashIndexDefinition>,
@@ -70,7 +70,7 @@ pub struct FasterKv<'epoch, K, V, D: Disk> {
     _value: PhantomData<V>,
 }
 
-impl<'epoch, K, V, D: Disk + Clone> FasterKv<'epoch, K, V, D>
+impl<'epoch, K, V, D: Disk + Clone> RsKv<'epoch, K, V, D>
 where
     K: Sized + Copy + 'static + PartialEq,
     V: Sized + Clone + 'static + Default,
@@ -601,7 +601,7 @@ where
     pub fn recover(
         log_path: &str,
         token: &str,
-    ) -> Result<FasterKv<'static, K, V, FileSystemDisk>, Status> {
+    ) -> Result<RsKv<'static, K, V, FileSystemDisk>, Status> {
         let disk = FileSystemDisk::new(log_path)?;
 
         // 1. Read metadata
@@ -615,10 +615,10 @@ where
         let metadata: &CheckpointMetadata =
             unsafe { &*(buffer.as_ptr() as *const CheckpointMetadata) };
 
-        // 2. Create a new FasterKv instance
+        // 2. Create a new RsKv instance
         let table_size = metadata.index_metadata.table_size;
         let log_size = 1 << 30; // Simplified: 1GB. Should be stored in metadata.
-        let mut kv = FasterKv::<K, V, FileSystemDisk>::new(log_size, table_size, disk)?;
+        let mut kv = RsKv::<K, V, FileSystemDisk>::new(log_size, table_size, disk)?;
 
         // 3. Recover components
         kv.index

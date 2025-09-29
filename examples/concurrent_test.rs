@@ -1,6 +1,6 @@
 use rskv::core::status::Status;
 use rskv::device::file_system_disk::FileSystemDisk;
-use rskv::faster::{FasterKv, ReadContext, UpsertContext};
+use rskv::rskv_core::{RsKv, ReadContext, UpsertContext};
 use std::path::Path;
 use std::sync::{Arc, Barrier};
 use std::thread;
@@ -60,7 +60,7 @@ impl ReadContext for SimpleReadContext {
 }
 
 fn writer_thread(
-    kv: Arc<FasterKv<u64, SimpleData, FileSystemDisk>>,
+    kv: Arc<RsKv<u64, SimpleData, FileSystemDisk>>,
     barrier: Arc<Barrier>,
     thread_id: usize,
     num_operations: usize,
@@ -88,7 +88,7 @@ fn writer_thread(
 }
 
 fn reader_thread(
-    kv: Arc<FasterKv<u64, SimpleData, FileSystemDisk>>,
+    kv: Arc<RsKv<u64, SimpleData, FileSystemDisk>>,
     barrier: Arc<Barrier>,
     thread_id: usize,
     num_operations: usize,
@@ -114,7 +114,7 @@ fn reader_thread(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 FASTER Rust KV Store Concurrent Test");
+    println!("🚀 RsKv Concurrent Test");
     println!("=======================================");
 
     let temp_dir = "/tmp/rskv_concurrent_test";
@@ -125,7 +125,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("📦 Initializing KV store...");
     let disk = FileSystemDisk::new(temp_dir)?;
-    let kv = Arc::new(FasterKv::<u64, SimpleData, FileSystemDisk>::new(
+    let kv = Arc::new(RsKv::<u64, SimpleData, FileSystemDisk>::new(
         1 << 24,
         1 << 18,
         disk,

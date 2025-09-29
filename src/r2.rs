@@ -1,7 +1,7 @@
 use crate::core::record::{Record, RecordInfo};
 use crate::core::status::Status;
 use crate::device::file_system_disk::FileSystemDisk;
-use crate::faster::{FasterKv, ReadContext, RmwContext, UpsertContext};
+use crate::rskv_core::{RsKv, ReadContext, RmwContext, UpsertContext};
 use crate::index::IHashIndex;
 use crate::index::mem_index::FindContext;
 use crate::performance::access_analyzer::{AccessAnalyzer, AnalyzerConfig, OperationType};
@@ -14,11 +14,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(test)]
 mod tests;
 
-// Redefine FasterKv with a specific index type for clarity.
-pub type HotStore<'a, K, V> = FasterKv<'a, K, V, FileSystemDisk>;
-pub type ColdStore<'a, K, V> = FasterKv<'a, K, V, FileSystemDisk>; // This is conceptually the cold store.
+// Redefine RsKv with a specific index type for clarity.
+pub type HotStore<'a, K, V> = RsKv<'a, K, V, FileSystemDisk>;
+pub type ColdStore<'a, K, V> = RsKv<'a, K, V, FileSystemDisk>; // This is conceptually the cold store.
 
-pub struct F2Kv<'epoch, K, V> {
+pub struct R2Kv<'epoch, K, V> {
     hot_store: HotStore<'epoch, K, V>,
     cold_store: ColdStore<'epoch, K, V>,
     migration_manager: Arc<MigrationManager>,
@@ -27,7 +27,7 @@ pub struct F2Kv<'epoch, K, V> {
     _v: PhantomData<V>,
 }
 
-impl<'epoch, K, V> F2Kv<'epoch, K, V>
+impl<'epoch, K, V> R2Kv<'epoch, K, V>
 where
     K: Sized + Copy + 'static + PartialEq,
     V: Sized + Copy + 'static + Default,
@@ -36,8 +36,8 @@ where
         let hot_disk = FileSystemDisk::new(hot_log_path)?;
         let cold_disk = FileSystemDisk::new(cold_log_path)?;
 
-        let hot_store = FasterKv::new(1 << 28, 1 << 20, hot_disk)?;
-        let cold_store = FasterKv::new(1 << 30, 1 << 24, cold_disk)?;
+        let hot_store = RsKv::new(1 << 28, 1 << 20, hot_disk)?;
+        let cold_store = RsKv::new(1 << 30, 1 << 24, cold_disk)?;
 
         let migration_config = MigrationConfig {
             max_hot_size_bytes: 1 << 28, // 256MB
@@ -63,8 +63,8 @@ where
         let hot_disk = FileSystemDisk::new(hot_log_path)?;
         let cold_disk = FileSystemDisk::new(cold_log_path)?;
 
-        let hot_store = FasterKv::new(1 << 28, 1 << 20, hot_disk)?;
-        let cold_store = FasterKv::new(1 << 30, 1 << 24, cold_disk)?;
+        let hot_store = RsKv::new(1 << 28, 1 << 20, hot_disk)?;
+        let cold_store = RsKv::new(1 << 30, 1 << 24, cold_disk)?;
 
         Ok(Self {
             hot_store,

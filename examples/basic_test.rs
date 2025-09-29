@@ -1,6 +1,6 @@
 use rskv::core::status::Status;
 use rskv::device::file_system_disk::FileSystemDisk;
-use rskv::faster::{FasterKv, ReadContext, UpsertContext};
+use rskv::rskv_core::{RsKv, ReadContext, UpsertContext};
 use std::path::Path;
 
 // Simple test context implementations
@@ -53,7 +53,7 @@ impl ReadContext for TestReadContext {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("FASTER Rust KV Store Basic Test");
+    println!("RsKv Basic Test");
 
     // Create a temporary directory for testing
     let temp_dir = "/tmp/rskv_test";
@@ -64,14 +64,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize the KV store
     let disk = FileSystemDisk::new(temp_dir)?;
-    let kv = FasterKv::<u64, String, FileSystemDisk>::new(1 << 20, 1 << 16, disk)?; // 1MB log, 64K table
+    let kv = RsKv::<u64, String, FileSystemDisk>::new(1 << 20, 1 << 16, disk)?; // 1MB log, 64K table
 
     println!("✓ KV store initialized successfully");
 
     // Test upsert operation
     let upsert_ctx = TestUpsertContext {
         key: 123,
-        value: "Hello, FASTER!".to_string(),
+        value: "Hello, RsKv!".to_string(),
     };
 
     let status = kv.upsert(&upsert_ctx);

@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 RSKV is a high-performance key-value store implementation in Rust based on Microsoft FASTER. It provides concurrent access, persistence, and efficient memory management using epoch-based concurrency control. The project includes two main implementations:
 
-1. **FasterKv**: Core FASTER implementation with hot data storage
-2. **F2Kv**: Two-tier storage system with hot/cold data separation and automatic migration
+1. **RsKv**: Core FASTER implementation with hot data storage
+2. **R2Kv**: Two-tier storage system with hot/cold data separation and automatic migration
 
 ## Build Commands
 
@@ -30,18 +30,21 @@ make build-release
 cargo test --all-features
 make test
 
-# Run F2 specific tests
-cargo test f2_tests
-./run_f2_tests.sh
+# Run R2 specific tests (unit tests only)
+make test-r2
+
+# Run complete R2 test suite (with examples)
+make test-r2-full
 
 # Run specific examples
-cargo run --example f2_basic_example
-cargo run --example f2_cold_hot_migration_test
-cargo run --example f2_comprehensive_test
-cargo run --example f2_migration_stress_test
+cargo run --example r2_basic_example
+cargo run --example r2_cold_hot_migration_test
+cargo run --example r2_comprehensive_test
+cargo run --example r2_migration_stress_test
+cargo run --example r2_performance_example
 
 # Run with make
-make run-example EXAMPLE=f2_basic_example
+make run-example EXAMPLE=r2_basic_example
 ```
 
 ## Lint and Format Commands
@@ -89,11 +92,12 @@ make audit
 - **`hlog/` module**: Hybrid log implementation with persistent memory allocation
 - **`device/` module**: Storage device abstraction with file system disk implementation
 - **`environment/` module**: Environment abstraction for file operations
+- **`performance/` module**: Performance optimization components including migration management, access analysis, batch operations, and cache optimization
 
 ### Key Implementations
 
-- **`faster.rs`**: Main FasterKv implementation providing core KV operations (Read, Upsert, RMW, Delete)
-- **`f2.rs`**: F2Kv two-tier storage with automatic hot/cold data migration
+- **`rskv_core.rs`**: Main RsKv implementation providing core KV operations (Read, Upsert, RMW, Delete)
+- **`r2.rs`**: R2Kv two-tier storage with automatic hot/cold data migration and performance monitoring
 
 ### Data Flow Architecture
 
@@ -111,20 +115,22 @@ The codebase uses context patterns for operations:
 
 ## Testing Strategy
 
-### F2 Testing Suite
+### R2 Testing Suite
 
-The F2 implementation has comprehensive testing:
+The R2 implementation has comprehensive testing:
 - Basic functionality tests
 - Cold/hot migration tests
 - Concurrent access tests
 - Performance benchmarks
 - Stress tests
+- Performance optimization tests (19 unit tests)
 
-Run the complete F2 test suite with: `./run_f2_tests.sh`
+Run the complete R2 test suite with: `./run_r2_tests.sh`
 
 ### Unit Tests
 
-Core functionality tests are located in `src/f2_tests.rs` and `src/f2/tests.rs`.
+Core functionality tests are located in `src/r2/tests.rs` and various module test files.
+Performance optimization tests are in `src/performance/*/tests.rs`.
 
 ## Key Development Notes
 
@@ -137,5 +143,22 @@ Core functionality tests are located in `src/f2_tests.rs` and `src/f2/tests.rs`.
 
 ## Examples Location
 
-All usage examples are in the `examples/` directory with comprehensive documentation in F2_MIGRATION_GUIDE.md.
+All usage examples are in the `examples/` directory with comprehensive documentation in R2_MIGRATION_GUIDE.md.
+
+### Available Examples
+- `r2_basic_example.rs`: Basic R2Kv operations
+- `r2_cold_hot_migration_test.rs`: Migration testing
+- `r2_comprehensive_test.rs`: Comprehensive feature tests
+- `r2_migration_stress_test.rs`: Stress testing
+- `r2_performance_example.rs`: Performance monitoring and optimization demo
+
+## Performance Features
+
+R2Kv includes advanced performance optimization features:
+- **Migration Manager**: Intelligent hot/cold data migration with multiple strategies
+- **Access Analyzer**: Automatic access pattern detection and analysis
+- **Batch Optimizer**: Operation batching and reordering
+- **Cache Optimizer**: Cache-friendly data layouts and CPU prefetching
+- **Real-time Monitoring**: Performance statistics and recommendations
+
 Never use emoji in test cases and docs.

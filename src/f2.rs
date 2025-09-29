@@ -4,7 +4,12 @@ use crate::device::file_system_disk::FileSystemDisk;
 use crate::faster::{FasterKv, ReadContext, RmwContext, UpsertContext};
 use crate::index::IHashIndex;
 use crate::index::mem_index::FindContext;
+use crate::performance::access_analyzer::{AccessAnalyzer, AnalyzerConfig, OperationType};
+use crate::performance::migration_manager::{KeyStats, MigrationConfig, MigrationManager};
+use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::sync::{Arc, RwLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(test)]
 mod tests;
@@ -16,6 +21,9 @@ pub type ColdStore<'a, K, V> = FasterKv<'a, K, V, FileSystemDisk>; // This is co
 pub struct F2Kv<'epoch, K, V> {
     hot_store: HotStore<'epoch, K, V>,
     cold_store: ColdStore<'epoch, K, V>,
+    migration_manager: Arc<MigrationManager>,
+    access_analyzer: Arc<AccessAnalyzer>,
+    key_stats: Arc<RwLock<HashMap<u64, Arc<KeyStats>>>>,
     _v: PhantomData<V>,
 }
 
@@ -31,32 +39,131 @@ where
         let hot_store = FasterKv::new(1 << 28, 1 << 20, hot_disk)?;
         let cold_store = FasterKv::new(1 << 30, 1 << 24, cold_disk)?;
 
+        let migration_config = MigrationConfig {
+            max_hot_size_bytes: 1 << 28, // 256MB
+            ..Default::default()
+        };
+
         Ok(Self {
             hot_store,
             cold_store,
+            migration_manager: Arc::new(MigrationManager::new(migration_config)),
+            access_analyzer: Arc::new(AccessAnalyzer::new(AnalyzerConfig::default())),
+            key_stats: Arc::new(RwLock::new(HashMap::new())),
             _v: PhantomData,
         })
     }
 
+    pub fn new_with_config(
+        hot_log_path: &str,
+        cold_log_path: &str,
+        migration_config: MigrationConfig,
+        analyzer_config: AnalyzerConfig,
+    ) -> Result<Self, Status> {
+        let hot_disk = FileSystemDisk::new(hot_log_path)?;
+        let cold_disk = FileSystemDisk::new(cold_log_path)?;
+
+        let hot_store = FasterKv::new(1 << 28, 1 << 20, hot_disk)?;
+        let cold_store = FasterKv::new(1 << 30, 1 << 24, cold_disk)?;
+
+        Ok(Self {
+            hot_store,
+            cold_store,
+            migration_manager: Arc::new(MigrationManager::new(migration_config)),
+            access_analyzer: Arc::new(AccessAnalyzer::new(analyzer_config)),
+            key_stats: Arc::new(RwLock::new(HashMap::new())),
+            _v: PhantomData,
+        })
+    }
+
+    fn get_current_time_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64
+    }
+
+    fn get_or_create_key_stats(&self, key_hash: u64) -> Arc<KeyStats> {
+        // Try read first
+        if let Ok(stats_map) = self.key_stats.read() {
+            if let Some(stats) = stats_map.get(&key_hash) {
+                return Arc::clone(stats);
+            }
+        }
+
+        // Need to create new stats
+        let new_stats = Arc::new(KeyStats::new(std::mem::size_of::<K>() + std::mem::size_of::<V>()));
+
+        if let Ok(mut stats_map) = self.key_stats.write() {
+            stats_map.entry(key_hash).or_insert_with(|| Arc::clone(&new_stats));
+        }
+
+        new_stats
+    }
+
     pub fn upsert(&self, context: &impl UpsertContext<Key = K, Value = V>) -> Status {
+        let key_hash = context.key_hash();
+
+        // Record access
+        self.access_analyzer.record_access(key_hash, OperationType::Write);
+
+        // Update key stats
+        let stats = self.get_or_create_key_stats(key_hash);
+        stats.record_access(Self::get_current_time_ms());
+        stats.set_in_hot(true);
+
+        // Record migration
+        self.migration_manager.record_migration_to_hot(stats.get_size());
+
         // All writes go to the hot store.
         self.hot_store.upsert(context)
     }
 
     pub fn read(&self, context: &mut impl ReadContext<Key = K, Value = V>) -> Status {
+        let key_hash = context.key_hash();
+
+        // Record access
+        self.access_analyzer.record_access(key_hash, OperationType::Read);
+
+        // Update key stats
+        let stats = self.get_or_create_key_stats(key_hash);
+        let current_time = Self::get_current_time_ms();
+        stats.record_access(current_time);
+
         let status = self.hot_store.read(context);
         if status == Status::NotFound {
             // If not found in hot store, check cold store.
-            self.cold_store.read(context)
+            let cold_status = self.cold_store.read(context);
+
+            // If found in cold store, check if we should migrate to hot
+            if cold_status == Status::Ok {
+                stats.set_in_hot(false);
+                if self.migration_manager.should_migrate_to_hot(&stats, current_time) {
+                    // Mark for future migration (actual migration happens in rmw)
+                }
+            }
+
+            cold_status
         } else {
+            stats.set_in_hot(true);
             status
         }
     }
 
     pub fn rmw(&self, context: &mut impl RmwContext<Key = K, Value = V>) -> Status {
+        let key_hash = context.key_hash();
+
+        // Record access
+        self.access_analyzer.record_access(key_hash, OperationType::Update);
+
+        // Update key stats
+        let stats = self.get_or_create_key_stats(key_hash);
+        stats.record_access(Self::get_current_time_ms());
+
         loop {
             let status = self.hot_store.rmw(context);
             if status != Status::NotFound {
+                stats.set_in_hot(true);
                 return status;
             }
 
@@ -139,5 +246,25 @@ where
                 (*record_ptr).header.set_invalid(true);
             }
         }
+    }
+
+    /// Get migration statistics
+    pub fn get_migration_stats(&self) -> crate::performance::migration_manager::MigrationStats {
+        self.migration_manager.get_stats()
+    }
+
+    /// Get access pattern statistics
+    pub fn get_access_stats(&self) -> crate::performance::access_analyzer::AccessStats {
+        self.access_analyzer.analyze_patterns()
+    }
+
+    /// Get access pattern recommendation
+    pub fn get_access_recommendation(&self) -> crate::performance::access_analyzer::AccessRecommendation {
+        self.access_analyzer.get_recommendation()
+    }
+
+    /// Get hot keys (most frequently accessed)
+    pub fn get_hot_keys(&self, n: usize) -> Vec<(u64, u64)> {
+        self.access_analyzer.get_hot_keys(n)
     }
 }

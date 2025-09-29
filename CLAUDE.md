@@ -138,3 +138,4 @@ Core functionality tests are located in `src/f2_tests.rs` and `src/f2/tests.rs`.
 ## Examples Location
 
 All usage examples are in the `examples/` directory with comprehensive documentation in F2_MIGRATION_GUIDE.md.
+Never use emoji in test cases and docs.

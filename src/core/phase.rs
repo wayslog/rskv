@@ -1,6 +1,6 @@
 /// Phases, used internally by FASTER to keep track of how far along FASTER has gotten during
 /// checkpoint, gc, and grow actions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum Phase {
     /// Checkpoint phases.

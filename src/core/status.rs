@@ -132,8 +132,10 @@ impl Status {
         matches!(
             self,
             Status::Pending
-                | Status::NotFound
                 | Status::LockContentionTimeout
+                | Status::OutOfMemory
+                | Status::AllocationFailed
+                | Status::IoError
                 | Status::BufferTooSmall
         )
     }
@@ -319,6 +321,7 @@ impl<T> ResultExt<T> for Result<T> {
     fn with_location(self) -> ContextResult<T> {
         self.map_err(|status| {
             ErrorContext::new(status)
+                .with_location(format!("{}:{}", file!(), line!()))
         })
     }
 }

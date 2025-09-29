@@ -59,6 +59,20 @@ impl FixedPageAddress {
     pub fn offset(&self) -> u32 {
         (self.0 & Self::K_MAX_OFFSET) as u32
     }
+
+    /// Creates a new FixedPageAddress from page and offset
+    pub fn new(page: u64, offset: u64) -> Self {
+        debug_assert!(page <= Self::K_MAX_PAGE, "Page {} exceeds maximum {}", page, Self::K_MAX_PAGE);
+        debug_assert!(offset <= Self::K_MAX_OFFSET, "Offset {} exceeds maximum {}", offset, Self::K_MAX_OFFSET);
+
+        let control = (page << Self::K_OFFSET_BITS) | offset;
+        FixedPageAddress(control)
+    }
+
+    /// Returns true if this is an invalid address
+    pub fn is_invalid(&self) -> bool {
+        *self == Self::INVALID_ADDRESS
+    }
 }
 
 /// Atomic address into a fixed page.
@@ -230,22 +244,45 @@ impl<'epoch, T: Sized + Default> Default for MallocFixedPageSize<'epoch, T> {
 }
 
 impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
+    /// Safely get the page array, checking for null pointer
+    fn get_page_array(&self) -> Option<&FixedPageArray<T>> {
+        let array_ptr = self.page_array.load(Ordering::Acquire);
+        if array_ptr.is_null() {
+            None
+        } else {
+            Some(unsafe { &*array_ptr })
+        }
+    }
+
     pub fn new() -> Self {
-        Self {
-            alignment: 0,
-            page_array: AtomicPtr::new(ptr::null_mut()),
-            count: AtomicFixedPageAddress::default(),
+        let alignment = std::mem::align_of::<T>();
+
+        // Create initial array for basic functionality
+        let initial_array = Box::into_raw(Box::new(FixedPageArray::new(2, alignment)));
+
+        // Initialize the allocator with basic functionality
+        let mut allocator = Self {
+            alignment,
+            page_array: AtomicPtr::new(initial_array),
+            count: AtomicFixedPageAddress::new(FixedPageAddress::new(0, 1)), // Start from offset 1 to avoid invalid address
             epoch: None, // Will be set during initialization
             free_list: Mutex::new(VecDeque::new()),
             _marker: PhantomData,
+        };
+
+        // Ensure first page is allocated
+        unsafe {
+            (*initial_array).add_page(0);
         }
+
+        allocator
     }
 
     pub fn initialize(&mut self, alignment: usize, epoch: &'epoch LightEpoch) {
         self.uninitialize(); // Clear any previous state
         self.alignment = alignment;
         self.epoch = Some(epoch);
-        self.count = AtomicFixedPageAddress::new(FixedPageAddress::from_control(0));
+        self.count = AtomicFixedPageAddress::new(FixedPageAddress::new(0, 1)); // Start from offset 1 to avoid invalid address
 
         let initial_array = Box::into_raw(Box::new(FixedPageArray::new(2, alignment)));
         self.page_array.store(initial_array, Ordering::Release);
@@ -253,8 +290,7 @@ impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
             (*initial_array).add_page(0);
         }
 
-        // Allocate the null pointer address, which is address 0.
-        self.allocate();
+        // Note: We start counting from offset 1 to avoid generating invalid addresses
     }
 
     pub fn uninitialize(&mut self) {
@@ -267,7 +303,13 @@ impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
     }
 
     pub fn checkpoint(&self, file: &mut File) -> Result<u64, Status> {
-        let array = unsafe { &*self.page_array.load(Ordering::Acquire) };
+        let array = match self.get_page_array() {
+            Some(array) => array,
+            None => {
+                log::error!("Cannot checkpoint: page array not initialized");
+                return Err(Status::InternalError);
+            }
+        };
         let count = self.count.load(Ordering::Acquire);
         let num_pages = count.page() + if count.offset() > 0 { 1 } else { 0 };
         let mut offset = 0;
@@ -337,7 +379,7 @@ impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
 
     /// Gets a safe immutable reference to the element at the given address.
     pub fn get(&self, address: FixedPageAddress) -> &T {
-        let array = unsafe { &*self.page_array.load(Ordering::Acquire) };
+        let array = self.get_page_array().expect("Page array not initialized");
         let page = array.get(address.page());
         assert!(!page.is_null());
         let elements = unsafe { &(*page).elements };
@@ -347,7 +389,7 @@ impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
 
     /// Returns the actual memory address for a given FixedPageAddress
     pub fn get_address(&self, address: FixedPageAddress) -> *mut u8 {
-        let array = unsafe { &*self.page_array.load(Ordering::Acquire) };
+        let array = self.get_page_array().expect("Page array not initialized");
         let page = array.get(address.page());
         assert!(!page.is_null());
         let elements = unsafe { &(*page).elements };
@@ -360,8 +402,27 @@ impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
             Some(epoch) => epoch,
             None => {
                 // If epoch is not set, just allocate without epoch protection
-                let addr = self.count.fetch_add(1, Ordering::Relaxed);
-                let array = unsafe { &*self.page_array.load(Ordering::Acquire) };
+                let count_value = self.count.fetch_add(1, Ordering::Relaxed);
+
+                // 🔥 FIX: Check for null pointer before dereferencing
+                let array_ptr = self.page_array.load(Ordering::Acquire);
+                if array_ptr.is_null() {
+                    log::error!("Page array not initialized - returning invalid address");
+                    return FixedPageAddress::INVALID_ADDRESS;
+                }
+
+                // Calculate proper page and offset from counter
+                let page = count_value.page();
+                let offset = count_value.offset();
+
+                // Ensure we don't return the invalid address (0,0)
+                let addr = if page == 0 && offset == 0 {
+                    FixedPageAddress::new(0, 1) // Start from offset 1 to avoid invalid address
+                } else {
+                    count_value
+                };
+
+                let array = unsafe { &*array_ptr };
                 array.get_or_add(addr.page());
                 return addr;
             }
@@ -374,16 +435,27 @@ impl<'epoch, T: Sized + Default> MallocFixedPageSize<'epoch, T> {
         }
 
         // Fallback to allocating new
-        let addr = self.count.fetch_add(1, Ordering::Relaxed);
-        let mut array = unsafe { &*self.page_array.load(Ordering::Acquire) };
+        let count_value = self.count.fetch_add(1, Ordering::Relaxed);
+
+        // Calculate proper page and offset from counter
+        let page = count_value.page();
+        let offset = count_value.offset();
+
+        // Ensure we don't return the invalid address (0,0)
+        let addr = if page == 0 && offset == 0 {
+            FixedPageAddress::new(0, 1) // Start from offset 1 to avoid invalid address
+        } else {
+            count_value
+        };
+
+        let array = self.get_page_array().expect("Page array not initialized");
 
         if addr.page() >= array.size() {
             self.expand_array(addr.page() + 1, &guard);
-            array = unsafe { &*self.page_array.load(Ordering::Acquire) };
         }
 
         if addr.offset() == 0 && addr.page() + 1 < array.size() {
-            array.add_page(addr.page() + 1);
+            array.get_or_add(addr.page() + 1);
         }
         array.get_or_add(addr.page());
         addr

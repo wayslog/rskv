@@ -32,6 +32,9 @@ Thumbs.db
 # 测试覆盖率报告
 tarpaulin-report.html
 coverage/
+coverage_report/
+target/tarpaulin/
+*.profraw
 
 # 性能分析文件
 *.prof
